@@ -1,0 +1,171 @@
+%-----------------------------------------------------------------------------
+%
+%               Template for sigplanconf LaTeX Class
+%
+% Name:         sigplanconf-template.tex
+%
+% Purpose:      A template for sigplanconf.cls, which is a LaTeX 2e class
+%               file for SIGPLAN conference proceedings.
+%
+% Guide:        Refer to "Author's Guide to the ACM SIGPLAN Class,"
+%               sigplanconf-guide.pdf
+%
+% Author:       Paul C. Anagnostopoulos
+%               Windfall Software
+%               978 371-2316
+%               paul@windfall.com
+%
+% Created:      15 February 2005
+%
+%-----------------------------------------------------------------------------
+
+
+\documentclass[preprint]{sigplanconf}
+
+% The following \documentclass options may be useful:
+
+% preprint      Remove this option only once the paper is in final form.
+% 10pt          To set in 10-point type instead of 9-point.
+% 11pt          To set in 11-point type instead of 9-point.
+% authoryear    To obtain author/year citation style instead of numeric.
+
+\usepackage{amsmath}
+
+
+\begin{document}
+
+\special{papersize=8.5in,11in}
+\setlength{\pdfpageheight}{\paperheight}
+\setlength{\pdfpagewidth}{\paperwidth}
+
+\conferenceinfo{ICFP '14}{Month d--d, 20yy, City, ST, Country} 
+\copyrightyear{20yy} 
+\copyrightdata{978-1-nnnn-nnnn-n/yy/mm} 
+\doi{nnnnnnn.nnnnnnn}
+
+% Uncomment one of the following two, if you are not going for the 
+% traditional copyright transfer agreement.
+
+%\exclusivelicense                % ACM gets exclusive license to publish, 
+                                  % you retain copyright
+
+%\permissiontopublish             % ACM gets nonexclusive license to publish
+                                  % (paid open-access papers, 
+                                  % short abstracts)
+
+\titlebanner{banner above paper title}        % These are ignored unless
+\preprintfooter{short description of paper}   % 'preprint' option specified.
+
+\title{Type-Safe Client-Server Communication in Web Applications}
+\subtitle{Subtitle Text, if any}
+
+\authorinfo{Koen Claessen ans Anton Ekblad}
+           {Chalmers University of Technology}
+           {\{koen,antonek\}@chalmers.se}
+
+\maketitle
+
+\begin{abstract}
+This is the text of the abstract.
+\end{abstract}
+
+\category{CR-number}{subcategory}{third-level}
+
+% general terms are not compulsory anymore, 
+% you may leave them out
+%\terms
+%term1, term2
+%
+\keywords
+web
+
+\section{Introduction}
+
+Development of web applications using conventional means is often no task for
+the faint of heart. Code written in Javascript, the only widely supported
+language for client-side web applications, is often confusing and error-prone,
+much due to the language's lack of modularity, encapsulation facilities and
+type safety.
+
+Worse, most web applications, being intended to facilitate communication, data
+storage and other tasks involving some centralized resource, also require a
+significant server component. This component is usually implemented as a
+completely separate program, and communicates with the client code over some
+network protocol.
+
+Having your application rely on some network protocol for
+its internal functionality involves writing a lot of boilerplate network code
+and some serious advance planning of your application's features to be able to
+design a suitable protocol, hampering incremental development. Were we to
+discount this initial design burden, ensuring that the protocol is used
+correctly throughout the code base as the application evolves and gains new
+features would still put an ever increasing burden on the developer.
+
+This state of things is not a concious design choice - most web applications
+are conceptually a single entity, not two programs which just happen to talk
+to each other over a network - but a consequence of there being a large,
+distributed network between the client and server parts.
+However, such implementation details should not be allowed to dictate the way
+we structure and reason about our applications - clearly, an abstraction is
+called for.
+
+In this paper, we propose a programming model in which web applications are
+written as a single entity from which client and server binaries are generated
+during compilation. Type annotations in the source program control which parts
+are executed on the server and which are executed on the client, and the two
+communicate using type safe RPC calls.
+
+Other approaches exist which attempt to tackle the same issue[CITE: STRATIFIEDJS, DUETTO, SUNROOF]
+which solve some, but not all, of the associated problems. In particular, our
+solution has the following properties:
+
+\begin{itemize}
+  \item Type safety: StratifiedJS, being a close relative of the original
+        Javascript language, provides type safety for neither RPC calls nor the
+        core language and Duetto, being a C++ dialect, is neither memory safe
+        nor type safe.
+  \item Modularity: our programming model is built as a library on top of
+        Haskell and is thus easily portable to any Haskell-to-Javascrit
+        compiler. In contrast, StratifiedJS and Duetto are compilers in their
+        own right, not usable together with other similar tools.
+  \item Purely functional semantics: in contrast to StratifiedJS, Duetto and
+        Sunroof, our programming model enables the use of the full Haskell
+        language both on the server and the client.
+  \item Code reuse: with Sunroof, client code is written in an embedded
+        language whereas server code is written in full Haskell, necessitating
+        duplicate implementations of functions which may be of use to both the
+        client and the server parts. In our solution, once a function is
+        written it is usable on both the server and the client.
+\end{itemize}
+
+
+\section{The Haste compiler}
+\section{A seamless programming model}
+\section{Implementation}
+\section{Discussion and related work}
+
+\appendix
+\section{Appendix Title}
+
+This is the text of the appendix, if you need one.
+
+\acks
+
+Acknowledgments, if needed.
+
+% We recommend abbrvnat bibliography style.
+
+\bibliographystyle{abbrvnat}
+
+% The bibliography should be embedded for final submission.
+
+\begin{thebibliography}{}
+\softraggedright
+
+\bibitem[Smith et~al.(2009)Smith, Jones]{smith02}
+P. Q. Smith, and X. Y. Jones. ...reference text...
+
+\end{thebibliography}
+
+
+\end{document}
