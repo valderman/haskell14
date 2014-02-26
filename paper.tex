@@ -132,6 +132,88 @@ called for.
 \section{A seamless programming model}
 \section{Implementation}
 \section{The Haste compiler}
+
+In order to allow the same language to be used on both client and server, we
+obviously need some way to compile that language into Javascript. To this end,
+we make use of the Haste compiler\ \cite{haste}, developed as a MSc thesis and
+extended as part of this work. Haste builds on the GHC compiler to provide
+the full Haskell language, including most GHC-specific extensions, in the
+browser.
+
+\paragraph{Choosing a compiler} Haste is by no means the only
+Javascript-targeting compiler for a purely functional language. In particular,
+the GHC-based GHCJS\ \cite{ghcjs} and UHC\ \cite{uhc} compilers are both
+capable of compiling standard Haskell into Javascript; the Fay\ \cite{fay}
+language was designed from the ground up to target the web space using a subset
+of Haskell; and there exist solutions for compiling Erlang\ \cite{jserlang} and
+Clean\ \cite{jsclean} to Javascript as well.
+
+In the face of this multitude of options, why did we settle on Haste? We make
+the following demands of a candidate source language:
+
+\begin{itemize}
+  \item The language must provide a static type system, since one of our
+        primary concerns is to reduce defect rates through static typing of
+        the client-server communication channel.
+  \item The language must be compilable to both Javascript and a format
+        suitable for server-side execution as we want our web applications
+        to be written as a single, monolithic program.
+  \item We also want our language to be practical, in the sense that its output
+        should not be disproportionately large or slow. This is more important
+        for the client part, where we have to contend with slow connections and
+        the overhead of running within an interpreter, than for the server part.
+\end{itemize}
+
+Our first criterion rules out the dynamically typed Erlang. The second rules
+out Fay which unfortunately lacks critical Haskell features, most notably type
+classes.
+
+This still leaves us with four options: Clean, GHCJS, Haste and UHC. However,
+the output from GHCJS is prohibitively large - often in the range of several
+megabytes for very simple programs - which rules it out for our use case, in
+spite of providing slightly better compatibility with low-level GHC features
+than Haste. Similarly, the code produced by the UHC Javascript backend tends to
+be relatively slow due to it lacking the more mature optimization capabilities
+of GHC, as well as being in the same ballpark as GHCJS for size.\ \cite{haste}
+
+This leaves us choosing between Clean and Haste for our client compiler. Since
+most of our abstractions, both the cooperative multitasking and the type-safe
+client-server communication itself, are easily expressed as monads, well
+supported in Haskell thanks to do-notation, the choice fell to Haste.
+
+\paragraph{Implementation} As previously mentioned, Haste offloads much of the
+heavy lifting of compilation - parsing, type checking, intermediate code
+generation and many optimizations - onto GHC, and takes over code generation
+after the STG generation step, at the very end of the compilation process.
+STG is the last intermediate representation used by the GHC compiler before
+the final code generation takes place and has several benefits:
+
+\begin{itemize}
+  \item STG is still a functional intermediate representation, based on the
+        lambda calculus. When generating code for a high level target language
+        such as Javascript, where functions are first class objects, this
+        allows for a higher level translation than when doing traditional
+        compilation to lower level targets like stack machines or register
+        machines. This in turn allows us to make more efficient use of the
+        target language's runtime, leading to smaller, faster code.
+  \item In contrast to Haskell itself and GHC's intermediate Core language, STG
+        represents `thunks`, the construct used by GHC to implement non-strict
+        evaluation, as closures which are explicitly created and evaluated.
+        Closures are decorated with a wealth of information, such as their set
+        of captured varibles, any type information needed for code generation,
+        and so on. While extracting this information manually is not very hard,
+        having this done for us means we can get away with a simpler
+        compilation pipeline.
+  \item The language is very small, essentially only comprising lambda
+        abstraction and application, plus primitive operations and facilities
+        for calling out to other languages. Again, this allows the Haste
+        compiler to be a very simple thing indeed.
+  \item Any extensions to the Haskell language implemented by GHC will already
+        have been translated into this very simple intermediate format,
+        allowing us to support basically any extension GHC supports without
+        effort.
+\end{itemize}
+
 \section{Discussion and related work}
 
 Other approaches to this problem exist, notably in the form of the
@@ -253,7 +335,7 @@ is not violated at compile time. This could shorten development cycles as well
 as give a reasonable level of confidence that any run time policy violation is
 indeed an attempted attack.
 
-\paragraph{Reactive client-server toolkit} While we believe that our work
+\paragraph{Reactive client-server GUI toolkit} While we believe that our work
 represents a step forward in making web applications more robust and easier to
 develop, the basic model for updating the application's user-visible state is
 still essentially imperative. Implementing an FRP-style\ \cite{ppfrp} GUI
@@ -275,19 +357,37 @@ Acknowledgments, if needed.
 \softraggedright
 
 \bibitem[Bracker, Gill (2014)]{sunroof}
-J. Bracker and A. Gill, Sunroof: A Monadic DSL for Generating JavaScript, Practical Aspects of Declarative Languages, 65-80
+J. Bracker and A. Gill: Sunroof: A monadic DSL for generating JavaScript, Practical Aspects of Declarative Languages, 65-80, 2014
 
 \bibitem[Conductance application server (2014)]{conductance}
-THE INTERNETS, http://conductance.io
+THE INTERNETS: http://conductance.io
+
+\bibitem[Dijkstra et al (2013)]{uhc}
+A. Dijkstra, J. Stutterheim, A. Vermeulen, S. D. Swierstra: Building JavaScript applications with Haskell, Implementation and Application of Functional Languages, pp 37-52, 2013
+
+\bibitem[Domoszlai et al (2011)]{jsclean}
+L. Domoszlai, E. Bruël, J. M. Jansen: Implementing a non-strict purely functional language in JavaScript, in Acta Universitatis Sapientiae, 2011
 
 \bibitem[Duetto compiler (2014)]{duetto}
-THE INTERNETS, http://leaningtech.com/duetto/
+THE INTERNETS: http://leaningtech.com/duetto/
+
+\bibitem[Ekblad (2012)]{haste}
+A. Ekblad: Towards a declarative web, MSc thesis, University of Gothenburg, 2012
 
 \bibitem[Elliott (2009)]{ppfrp}
-C. M. Elliott, Push-pull functional reactive programming, in Proceedings of the 2nd ACM SIGPLAN symposium on Haskell
+C. M. Elliott: Push-pull functional reactive programming, in Proceedings of the 2nd ACM SIGPLAN symposium on Haskell, 2009
+
+\bibitem[The Fay language (2014)]{fay}
+THE INTERNETS: http://fay-lang.org
+
+\bibitem[Guthrie (2014)]{jserlang}
+G. Guthrie: http://luvv.ie/2014/01/21/your-transpiler-to-javascript-toolbox/, 2014
 
 \bibitem[Hedin et al (2014)]{jsflow}
-D. Hedin, A. Birgisson, L. Bello and A. Sabelfeld, JSFlow: Tracking Information Flow in JavaScript and its APIs
+D. Hedin, A. Birgisson, L. Bello and A. Sabelfeld: JSFlow: Tracking Information Flow in JavaScript and its APIs, 2014
+
+\bibitem[Nazarov (2012)]{ghcjs}
+V. Nazarov: GHCJS Haskell to Javascript Compiler, https://github.com/ghcjs/ghcjs
 
 \end{thebibliography}
 
