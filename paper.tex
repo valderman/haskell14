@@ -81,11 +81,31 @@ web
 
 \section{Introduction}
 
-Development of web applications using conventional means is often no task for
-the faint of heart. Code written in Javascript, the only widely supported
-language for client-side web applications, is often confusing and error-prone,
-much due to the language's lack of modularity, encapsulation facilities and
-type safety.
+Development of web applications is no task for the faint of heart.
+The conventional method involves splitting your program into two logical parts,
+writing the one in Javascript, which is notorious even among its proponents for
+being wonky and error-prone, and the other in the current language du jour.
+Then, two are glued together using whichever home-grown network protocol seems
+to fit the application. However, most web applications are conceptually
+monolithic entities, making this forced split an undesirable hindrance which
+introduces new possibilities for defects, adds development overhead and
+prevents code reuse.
+
+Several attempts have been made at tackling this problem, but none is, in our
+view, satisfactory. In this paper, we propose a programming model in which a
+web application is written as a single program from which client and server
+binaries are generated during compilation. Type annotations in the source
+program control which parts are executed on the server and which are executed
+on the client, and the two communicate using type safe RPC calls. Functions
+which are not explicitly declared as server-side or client-side are usable by
+either side. Our solution is implemented as a Haskell library requiring minimal
+to no compiler support, ensuring portability and modularity.
+
+\paragraph{Motivation}
+
+Code written in Javascript, the only widely supported language for client-side
+web applications, is often confusing and error-prone, much due to the
+language's lack of modularity, encapsulation facilities and type safety.
 
 Worse, most web applications, being intended to facilitate communication, data
 storage and other tasks involving some centralized resource, also require a
@@ -109,45 +129,137 @@ However, such implementation details should not be allowed to dictate the way
 we structure and reason about our applications - clearly, an abstraction is
 called for.
 
-In this paper, we propose a programming model in which web applications are
-written as a single entity from which client and server binaries are generated
-during compilation. Type annotations in the source program control which parts
-are executed on the server and which are executed on the client, and the two
-communicate using type safe RPC calls.
-
-Other approaches exist which attempt to tackle the same issue[CITE: STRATIFIEDJS, DUETTO, SUNROOF]
-which solve some, but not all, of the associated problems. In particular, our
-solution has the following properties:
-
-\begin{itemize}
-  \item Type safety: StratifiedJS, being a close relative of the original
-        Javascript language, provides type safety for neither RPC calls nor the
-        core language and Duetto, being a C++ dialect, is neither memory safe
-        nor type safe.
-  \item Modularity: our programming model is built as a library on top of
-        Haskell and is thus easily portable to any Haskell-to-Javascrit
-        compiler. In contrast, StratifiedJS and Duetto are compilers in their
-        own right, not usable together with other similar tools.
-  \item Purely functional semantics: in contrast to StratifiedJS, Duetto and
-        Sunroof, our programming model enables the use of the full Haskell
-        language both on the server and the client.
-  \item Code reuse: with Sunroof, client code is written in an embedded
-        language whereas server code is written in full Haskell, necessitating
-        duplicate implementations of functions which may be of use to both the
-        client and the server parts. In our solution, once a function is
-        written it is usable on both the server and the client.
-\end{itemize}
-
-
-\section{The Haste compiler}
 \section{A seamless programming model}
 \section{Implementation}
+\section{The Haste compiler}
 \section{Discussion and related work}
 
-\appendix
-\section{Appendix Title}
+Other approaches to this problem exist, notably in the form of the
+Conductance\ \cite{conductance}, Duetto\ \cite{duetto} and
+Sunroof\ \cite{sunroof} projects, all of which implement some synchronous
+abstraction over the network between the client and the server, much like our
+solution.
 
-This is the text of the appendix, if you need one.
+\paragraph{Conductance} Conductance is an application server built on
+StratifiedJS, a Javascript language extension which adds a few niceties such as
+cooperative multitasking and more concise syntax for many common tasks.
+Conductance uses an RPC-based model for client-server communication, much like
+our own, but also adds the possibility for the server to independently transmit
+data back to the client through the use of shared variables or call back into
+the client by way of function objects received via RPC call, as well as the
+possibility for both client and server to seamlessly modify variables located
+on the opposite end of the network.
+
+While Conductance gets rid of the callback-based programming model endemic to
+regular Javascript, it still suffers from many of its usual drawbacks. In
+particular, the the weak typing of Javascript poses a problem in that the
+programmer is in no way reprimanded by her tools for using server APIs
+incorrectly or trying to transmit values which can not be sensibly serialized
+and de-serialized, such as DOM nodes. Wrongly typed programs will thus crash, or
+even worse, gleefully keep running with erroneous state due to implicit type
+conversions, rather than give the programmer some advance warning that something
+is amiss.
+
+We are also not completely convinced that the ability to implicitly back and
+forth over the network is a unilaterally good thing; while this indeed provides
+the programmer some extra convenience, it also requires the programmer to
+exercise extra caution to avoid inadvertently sending large amounts of data
+back and forth over the network.
+
+\paragraph{Duetto} Duetto is a C++ compiler targeting the web, written from
+the ground up to produce code for both client and server simultaneously. It
+utilizes the new attributes mechanism introduced in C++11 to designate
+functions and data to live on either client or server side. Any calls to a
+function on the other side of the network and attempts to access remote data
+are implicit, requiring no extra annotations or scaffolding at the call site.
+
+Much like Conductance, Duetto suffers somewhat from its heritage: while the
+client-side code is not memory-unsafe, as it is not possible to generate
+memory-unsafe Javascript code, its server-side counterpart unfortunately is.
+Our reservations expressed about how network communication in Duetto can be
+initiated implicitly apply to Duetto as well.
+
+\paragraph{Sunroof} In contrast to the Conductance and Duetto, Sunroof is an
+embedded language. Implemented as a Haskell library, it allows the programmer
+to use Haskell to write code which is compiled to Javascript and executed on
+the client. The language can best be described as having Javascript semantics
+with Haskell's type system. Communication between client and server is
+accomplished through the use of ``downlinks'' and ``uplinks'', allowing for
+data to be sent to and from the client respectively.
+
+Sunroof is completely type-safe, in the DSL itself as well as in the
+communication with the Haskell host. However, the fact that client and server
+must be written in two separate languages - any code used to generate
+Javascript must of course be built solely from the primitives of the Sunroof
+language, precluding use of general Haskell code - makes code reuse hard.
+
+\paragraph{Advantages to our approach} We believe that our approach has a
+number of distinct advantages to the aforementioned attacks on the problem.
+
+Our approach gives the programmer access to the same strongly typed,
+general-purpose functional language on both client and server; any code which
+may be of use to both client and server is effortlessly shared, leading to less
+duplication of code and increased possibilities for reusing third party
+libraries.
+
+Any and all communication between client and server is both strongly typed
+and made explicit by the use of the `onServer` function, with the programmer
+having complete control over the serialization and de-serialization of data
+using the appropriate type classes. Aside from the obvious advantages of type
+safety, making the crossing of the network boundary explicit helps the
+programmer make an informed decision as to when and where server communication
+is appropriate.
+
+Our programming model is implemented as a library, assuming only two Haskell
+compilers, one targeting Javascript and one targeting the programmer's server
+platform of choice. While we use Haste as our Javascript-targeting compiler,
+modifying our implementation to use GHCJS or even the Javascript backend of UHC
+would be entirely straightforward. This implementation not only allows for
+greater flexibility, but also eliminates any potentially hairy interaction with
+compiler internals.
+
+\paragraph{Limitations} Unlike any of the related works, our approach takes a
+firm stand, regarding the client as the driver in the client-server
+relationship with the server taking on the role of a passive computational
+or storage resource. The server may thus not call back into the client at
+arbitrary points but is instead limited to returning answers to client-side
+queries. This is clearly less flexible than the back-and-forth model of Sunroof
+and Duetto or the shared variables of Conductance. However, we believe that
+this restriction makes program flow easier to follow and comprehend. Like the
+immutability of Haskell, this model gives programmers a not-so-subtle hint
+as to how they may want to structure their programs. Should this model prove
+insufficiently expressive, extending our existing model with an `onClient`
+counterpart to `onServer` would be relatively straightforward.
+
+\section{Future work}
+
+\paragraph{Information flow control} Web applications often make use of a wide
+range of third party code for user tracking, advertising, collecition of
+statistics and a wide range of other tasks. Any piece of code executing in the
+context of a particular web session may not only interact with any other piece
+of code executing in the same context, but may also perform basically limitless
+communication with third parties and may thus, inadvertently or not, leak
+information about the application state. This is obviously highly undesirable
+for many applications, which is why there is ongoing work in controlling the
+information flow within web applications\ \cite{jsflow}.
+
+While this would indeed provide an effective defence towards attackers and
+programming mistakes alike, there is value in being able to tell the two apart,
+as well as in catching policy violations resulting from programming mistakes
+as early as possible. An interesting venue of research would be to investigate
+whether we can take advantage of our strong typing to generate security policies
+for such an information flow control scheme, as well as ensure that this policy
+is not violated at compile time. This could shorten development cycles as well
+as give a reasonable level of confidence that any run time policy violation is
+indeed an attempted attack.
+
+\paragraph{Reactive client-server toolkit} While we believe that our work
+represents a step forward in making web applications more robust and easier to
+develop, the basic model for updating the application's user-visible state is
+still essentially imperative. Implementing an FRP-style\ \cite{ppfrp} GUI
+programming model on top of our client-server abstraction may prove a fruitful
+way to further improve the programmability of web-based distributed
+applications.
 
 \acks
 
@@ -162,8 +274,20 @@ Acknowledgments, if needed.
 \begin{thebibliography}{}
 \softraggedright
 
-\bibitem[Smith et~al.(2009)Smith, Jones]{smith02}
-P. Q. Smith, and X. Y. Jones. ...reference text...
+\bibitem[Bracker, Gill (2014)]{sunroof}
+J. Bracker and A. Gill, Sunroof: A Monadic DSL for Generating JavaScript, Practical Aspects of Declarative Languages, 65-80
+
+\bibitem[Conductance application server (2014)]{conductance}
+THE INTERNETS, http://conductance.io
+
+\bibitem[Duetto compiler (2014)]{duetto}
+THE INTERNETS, http://leaningtech.com/duetto/
+
+\bibitem[Elliott (2009)]{ppfrp}
+C. M. Elliott, Push-pull functional reactive programming, in Proceedings of the 2nd ACM SIGPLAN symposium on Haskell
+
+\bibitem[Hedin et al (2014)]{jsflow}
+D. Hedin, A. Birgisson, L. Bello and A. Sabelfeld, JSFlow: Tracking Information Flow in JavaScript and its APIs
 
 \end{thebibliography}
 
