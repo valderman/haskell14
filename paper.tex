@@ -185,8 +185,9 @@ supported in Haskell thanks to do-notation, the choice fell to Haste.
 heavy lifting of compilation - parsing, type checking, intermediate code
 generation and many optimizations - onto GHC, and takes over code generation
 after the STG generation step, at the very end of the compilation process.
-STG is the last intermediate representation used by the GHC compiler before
-the final code generation takes place and has several benefits:
+STG\ \cite{stg} is the last intermediate representation used by GHC before
+the final code generation takes place and has several benefits for use as
+Haste's target language:
 
 \begin{itemize}
   \item STG is still a functional intermediate representation, based on the
@@ -388,6 +389,9 @@ D. Hedin, A. Birgisson, L. Bello and A. Sabelfeld: JSFlow: Tracking Information 
 
 \bibitem[Nazarov (2012)]{ghcjs}
 V. Nazarov: GHCJS Haskell to Javascript Compiler, https://github.com/ghcjs/ghcjs
+
+\bibitem[Peyton Jones (1992)]{stg}
+S. Peyton Jones: Implementing lazy functional languages on stock hardware: the Spineless Tagless G-machine, Journal of Functional Programming, 1992
 
 \end{thebibliography}
 
