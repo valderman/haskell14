@@ -181,6 +181,27 @@ most of our abstractions, both the cooperative multitasking and the type-safe
 client-server communication itself, are easily expressed as monads, well
 supported in Haskell thanks to do-notation, the choice fell to Haste.
 
+\paragraph{Design of the Haste compiler} Haste is first and foremost intended
+to be a practical compiler; the ability to produce code which is lean and fast
+enough to be used in the real world is critical. To this end, we make several
+design choices and tradeoffs, some of which would be viewed as detrimental in a
+more purist context.
+
+One such tradeoff is the decision to make use of the facilities provided by the
+web browser - most prominently the Javascript engine's native garbage
+collector - as far as possible rather than implementing parts of the GHC
+runtime in Javascript. In the same vein, a conscious effort is made to generate
+as ``regular-looking'' code as possible. In some rare cases, this means having
+to sacrifice compatibility with low-level GHC features. Most notably, Haste
+does not support weak references or pre-emptive multitasking, as these would
+require modifications to the runtime system and generated code which confound
+the structure of the resulting Javascript and have a detrimental impact on code
+size and execution speed.
+
+GHCJS takes the opposite view, that faithful emulation of the GHC runtime is
+paramount. Of course, this brings an impressive degree of compatibility, at the
+cost of the blowup in code size mentioned previously.
+
 \paragraph{Implementation} As previously mentioned, Haste offloads much of the
 heavy lifting of compilation - parsing, type checking, intermediate code
 generation and many optimizations - onto GHC, and takes over code generation
@@ -213,7 +234,42 @@ Haste's target language:
         have been translated into this very simple intermediate format,
         allowing us to support basically any extension GHC supports without
         effort.
+  \item Application of external functions is always saturated, as is
+        application of most other functions. This allows for compiling most
+        function applications into simple Javascript function calls, limiting
+        the use of the slower dynamic techniques required to handle curried
+        functions in the general case\ \cite{fastcurry} to cases where it is
+        simply not possible to statically determine the arity of a function.
 \end{itemize}
+
+In light of its heavy reliance on STG, it may be more correct to categorize
+Haste as an STG compiler rather than a Haskell compiler.
+
+The runtime data representation of Haste programs is kept as close to regular
+Javascript programs as possible. The numeric types are represented using the
+Javascript \texttt{Number} type, which is defined as the IEEE754 double
+precision floating point type. This obviously adds some overhead to operations
+on integers as overflow and non-integer divisions must be handled. However, this
+is common practice in hand-written Javascript as well, and is generally handled
+efficiently by Javascript engines.
+
+Values of non-primitive data types in Haskell consist of a data constructor and
+zero or more arguments. In Haste, these values are represented using arrays,
+with the first element representing the data constructor and the following
+values representing its arguments. For instance, the value \texttt{42 :: Int}
+is represented as \texttt{[0, 42]}, the leading \texttt{0} representing the
+zeroth constructor of the \texttt{Int} type and the \texttt{42}, obviously,
+representing the ``machine'' integer. It may seem strange that a limited
+precision integer is represented using one level of indirection rather than as
+a simple number, but recall that the \texttt{Int} type is defined by GHC as
+\texttt{data Int = I\# Int\#}.
+
+Functions are represented as plain Javascript functions, one of the blessings
+of targeting a high level language, and application is can therefore be
+implemented as its Javascript counterpart in most cases. In the general case,
+however, functions may be curried. For such cases where the arity of an applied
+function can not be determined statically, application is implemented using the
+eval/apply method described in \cite{fastcurry} instead.
 
 \section{Discussion and related work}
 
@@ -243,11 +299,11 @@ even worse, gleefully keep running with erroneous state due to implicit type
 conversions, rather than give the programmer some advance warning that something
 is amiss.
 
-We are also not completely convinced that the ability to implicitly back and
-forth over the network is a unilaterally good thing; while this indeed provides
-the programmer some extra convenience, it also requires the programmer to
-exercise extra caution to avoid inadvertently sending large amounts of data
-back and forth over the network.
+We are also not completely convinced that the ability to implicitly pass data
+back and forth over the network is a unilaterally good thing; while this indeed
+provides the programmer some extra convenience, it also requires the programmer
+to exercise extra caution to avoid inadvertently sending large amounts of data
+over the network.
 
 \paragraph{Duetto} Duetto is a C++ compiler targeting the web, written from
 the ground up to produce code for both client and server simultaneously. It
@@ -286,10 +342,10 @@ duplication of code and increased possibilities for reusing third party
 libraries.
 
 Any and all communication between client and server is both strongly typed
-and made explicit by the use of the `onServer` function, with the programmer
-having complete control over the serialization and de-serialization of data
-using the appropriate type classes. Aside from the obvious advantages of type
-safety, making the crossing of the network boundary explicit helps the
+and made explicit by the use of the \texttt{onServer} function, with the
+programmer having complete control over the serialization and de-serialization
+of data using the appropriate type classes. Aside from the obvious advantages
+of type safety, making the crossing of the network boundary explicit helps the
 programmer make an informed decision as to when and where server communication
 is appropriate.
 
@@ -311,8 +367,9 @@ and Duetto or the shared variables of Conductance. However, we believe that
 this restriction makes program flow easier to follow and comprehend. Like the
 immutability of Haskell, this model gives programmers a not-so-subtle hint
 as to how they may want to structure their programs. Should this model prove
-insufficiently expressive, extending our existing model with an `onClient`
-counterpart to `onServer` would be relatively straightforward.
+insufficiently expressive, extending our existing model with an
+\texttt{onClient} counterpart to \texttt{onServer} would be relatively
+straightforward.
 
 \section{Future work}
 
@@ -387,11 +444,17 @@ G. Guthrie: http://luvv.ie/2014/01/21/your-transpiler-to-javascript-toolbox/, 20
 \bibitem[Hedin et al (2014)]{jsflow}
 D. Hedin, A. Birgisson, L. Bello and A. Sabelfeld: JSFlow: Tracking Information Flow in JavaScript and its APIs, 2014
 
+\bibitem[Marlow, Peyton Jones (2004)]{fastcurry}
+S. Marlow, S. Peyton Jones: Making a fast curry: push/enter vs. eval/apply for higher order languages, 2004
+
 \bibitem[Nazarov (2012)]{ghcjs}
 V. Nazarov: GHCJS Haskell to Javascript Compiler, https://github.com/ghcjs/ghcjs
 
 \bibitem[Peyton Jones (1992)]{stg}
 S. Peyton Jones: Implementing lazy functional languages on stock hardware: the Spineless Tagless G-machine, Journal of Functional Programming, 1992
+
+\bibitem[Peyton Jones (2001)]{ffi}
+S. Peyton Jones: Tackling the awkward squad: monadic input/output, concurrency, exceptions, and foreign-language calls in Haskell
 
 \end{thebibliography}
 
