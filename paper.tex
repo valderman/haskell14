@@ -30,7 +30,7 @@
 % authoryear    To obtain author/year citation style instead of numeric.
 
 \usepackage{amsmath}
-
+\input{macros}
 
 \begin{document}
 
@@ -59,7 +59,7 @@
 \title{Type-Safe Client-Server Communication in Web Applications}
 \subtitle{Subtitle Text, if any}
 
-\authorinfo{Koen Claessen ans Anton Ekblad}
+\authorinfo{Koen Claessen and Anton Ekblad}
            {Chalmers University of Technology}
            {\{koen,antonek\}@chalmers.se}
 
@@ -247,7 +247,7 @@ Haste as an STG compiler rather than a Haskell compiler.
 
 The runtime data representation of Haste programs is kept as close to regular
 Javascript programs as possible. The numeric types are represented using the
-Javascript \texttt{Number} type, which is defined as the IEEE754 double
+Javascript \lstinline!Number! type, which is defined as the IEEE754 double
 precision floating point type. This obviously adds some overhead to operations
 on integers as overflow and non-integer divisions must be handled. However, this
 is common practice in hand-written Javascript as well, and is generally handled
@@ -256,13 +256,13 @@ efficiently by Javascript engines.
 Values of non-primitive data types in Haskell consist of a data constructor and
 zero or more arguments. In Haste, these values are represented using arrays,
 with the first element representing the data constructor and the following
-values representing its arguments. For instance, the value \texttt{42 :: Int}
-is represented as \texttt{[0, 42]}, the leading \texttt{0} representing the
-zeroth constructor of the \texttt{Int} type and the \texttt{42}, obviously,
-representing the ``machine'' integer. It may seem strange that a limited
-precision integer is represented using one level of indirection rather than as
-a simple number, but recall that the \texttt{Int} type is defined by GHC as
-\texttt{data Int = I\# Int\#}.
+values representing its arguments. For instance, the value \lstinline!42 :: Int!
+is represented as \lstinline![0, 42]!, the leading \lstinline!0! representing
+the zeroth constructor of the \lstinline!Int! type and the \lstinline!42!,
+obviously, representing the ``machine'' integer. It may seem strange that a
+limited precision integer is represented using one level of indirection rather
+than as a simple number, but recall that the \lstinline!Int! type is defined by
+GHC as \lstinline!data Int = I# Int#!.
 
 Functions are represented as plain Javascript functions, one of the blessings
 of targeting a high level language, and application is can therefore be
@@ -270,6 +270,72 @@ implemented as its Javascript counterpart in most cases. In the general case,
 however, functions may be curried. For such cases where the arity of an applied
 function can not be determined statically, application is implemented using the
 eval/apply method described in \cite{fastcurry} instead.
+
+\paragraph{Interfacing with Javascript} While Haste supports the Foreign
+Function Interface inherited from GHC, with its usual features and limitations
+\ \cite{ffi}, it is often impractical to work within the confines of an
+interface designed for communication on a very low level. For this reason
+Haste sports its own method for interacting with Javascript as well, which
+allows the programmer to pass any value back and forth between Haskell and
+Javascript, as long as she can come up with a way to translate this value
+between its Haskell and Javascript representations. Of course, not performing
+any translation at all is also a valid ``translation'', which allows Haskell
+code to store any Javascript value for later retrieval without inspecting it
+and vice versa. The following example implements mutable variables using this
+custom Javascript interface.
+
+\begin{code}
+import Haste.Foreign
+
+-- A MutableVar is completely opaque to Haskell code
+-- and is only ever manipulated in Javascript. Thus,
+-- we use the Unpacked type to represent it,
+-- indicating a completely opaque value.
+newtype MutableVar a = MV Unpacked
+
+instance Marshal (MutableVar a) where
+  pack          = MV
+  unpack (MV x) = x
+
+newMutable :: Marshal a => a -> IO (MutableVar a)
+newMutable = ffi "(function(x) {return {val: x};})"
+
+setMutable :: Marshal a => MutableVar a -> a -> IO ()
+setMutable = ffi "(function(m, x) {m.val = x;})"
+
+getMutable :: Marshal a => MutableVar a -> IO a
+getMutable = ffi "(function(m) {return m.val;})"
+\end{code}
+
+The core of this interface consists of the \lstinline!ffi! function, which
+allows the programmer to create a Haskell function from arbitrary Javascript
+code. This function exploits Javascript's ability to parse and execute
+arbitrary strings at run-time using the \lstinline!eval! function, coupled with
+the fact that functions in Haste and in Javascript share the same
+representation, to dynamically create a function object at runtime.
+The \lstinline!ffi! function is typed using a well-known type class trick for
+creating statically typed variadic functions\ \cite{printf}, and works very
+much like the \lstinline!printf! function of Haskell's standard library.
+When applied to one or more arguments instantiating the \lstinline!Marshal!
+type class, the \lstinline!pack! function is applied to each argument,
+marshalling them into their respective Javascript representations, before they
+are passed to the dynamically created function. When that function returns,
+the inverse \lstinline!unpack! function is applied to its return value before
+it is passed back into Haskell land.
+
+As the marshalling functions chosen for each argument and the foreign
+function's return value depends on its type, the programmer must explicitly
+specify the type of each function imported using \lstinline!ffi!; in this,
+Haste's custom method is no different from the conventional FFI.
+
+There are several benefits to this method, the most obvious being that new
+marshallable types can be added by simply instantiating a type class. Thanks
+to the lazy evaluation employed by Haste, each foreign function object is only
+created once and then cached; any further calls to the same (Haskell) function
+will reuse the cached function object. Implementation-wise, this method is also
+very non-intrusive, requiring only the use of the normal FFI to import
+Javascript's \lstinline!eval! function; no modification of the compiler is
+needed.
 
 \section{Discussion and related work}
 
@@ -291,7 +357,7 @@ on the opposite end of the network.
 
 While Conductance gets rid of the callback-based programming model endemic to
 regular Javascript, it still suffers from many of its usual drawbacks. In
-particular, the the weak typing of Javascript poses a problem in that the
+particular, the weak typing of Javascript poses a problem in that the
 programmer is in no way reprimanded by her tools for using server APIs
 incorrectly or trying to transmit values which can not be sensibly serialized
 and de-serialized, such as DOM nodes. Wrongly typed programs will thus crash, or
@@ -342,7 +408,7 @@ duplication of code and increased possibilities for reusing third party
 libraries.
 
 Any and all communication between client and server is both strongly typed
-and made explicit by the use of the \texttt{onServer} function, with the
+and made explicit by the use of the \lstinline!onServer! function, with the
 programmer having complete control over the serialization and de-serialization
 of data using the appropriate type classes. Aside from the obvious advantages
 of type safety, making the crossing of the network boundary explicit helps the
@@ -368,20 +434,20 @@ this restriction makes program flow easier to follow and comprehend. Like the
 immutability of Haskell, this model gives programmers a not-so-subtle hint
 as to how they may want to structure their programs. Should this model prove
 insufficiently expressive, extending our existing model with an
-\texttt{onClient} counterpart to \texttt{onServer} would be relatively
+\lstinline!onClient! counterpart to \lstinline!onServer! would be relatively
 straightforward.
 
 While our solution completely safe from the invocation point of the
-\texttt{runApp} function onward, capturing IO-dependent variables introduced
+\lstinline!runApp! function onward, capturing IO-dependent variables introduced
 before this invocation may lead to the client and server execution paths
 diverging. Consider the following example:
 
-\begin{verbatim}
+\begin{code}
 main = do
   captured <- randomRIO (False, True)
 
   runApp config $ do
-    diverged <- export $ \\transmitted -> do
+    diverged <- export $ \transmitted -> do
       if captured == transmitted
         then return ``All OK''
         else return ``Diverged''
@@ -389,22 +455,22 @@ main = do
     runClient $ do
       divergence <- onServer (diverged <.> captured)
       alert divergence
-\end{verbatim}
+\end{code}
 
 The dialog box displayed by this program will read ``All OK'' roughly half
 of the times it is run, while in half of the runs it will read ``Diverged''.
-The reason for this is that the \texttt{randomRIO} computation will be executed
-twice - once on the client, and once on the server. Whenever the computation
-returns differening results, the client and the server will have conflicting
-opinions on the actual value of \texttt{captured}, causing any code
-which - quite reasonably - assumes that variables are consistent between
+The reason for this is that the \lstinline!randomRIO! computation will be
+executed twice - once on the client, and once on the server. Whenever the
+computation returns differening results, the client and the server will have
+conflicting opinions on the actual value of \lstinline!captured!, causing any
+code which - quite reasonably - assumes that variables are consistent between
 client and server to fail.
 
 This is easily remedied however, by a slight compiler modification. Instead of
-using \texttt{main :: IO ()} as the program entry point, introduce a function
-\texttt{appMain :: App Done} for this purpose, and let the runtime system start
-the application by invoking \texttt{runApp config appMain}, where
-\texttt{config} contains the URL and port configuration for the server, given
+using \lstinline!main :: IO ()! as the program entry point, introduce a function
+\lstinline!appMain :: App Done! for this purpose, and let the runtime system
+start the application by invoking \lstinline!runApp config appMain!, where
+\lstinline!config! contains the URL and port configuration for the server, given
 by the programmer using a compiler flag. As this modification only affects the
 program's entry point, which is already given ``special'' treatment in Haskell
 compilers, we believe this to be a practical, non-intrusive way to remove this
@@ -412,10 +478,10 @@ limitation, and in fact made this modification to the Haste compiler for our
 implementation.
 
 The astute reader may notice that the same applies to code using
-\texttt{unsafePerformIO} to declare IO-dependent top-level values, and that
+\lstinline!unsafePerformIO! to declare IO-dependent top-level values, and that
 this problem is unaffected by changing the type of the program's entry point.
 While this is indeed true, we feel that since it is quite possible to break
-any Haskell program using \texttt{unsafePerformIO}, even subverting the type
+any Haskell program using \lstinline!unsafePerformIO!, even subverting the type
 system, this is not a problem with our solution.
 
 \section{Future work}
@@ -502,6 +568,9 @@ S. Peyton Jones: Implementing lazy functional languages on stock hardware: the S
 
 \bibitem[Peyton Jones (2001)]{ffi}
 S. Peyton Jones: Tackling the awkward squad: monadic input/output, concurrency, exceptions, and foreign-language calls in Haskell
+
+\bibitem[Taylor (2013)]{printf}
+C. Taylor: Polyvariadic Functions and Printf, http://chris-taylor.github.io/blog/2013/03/01/how-haskell-printf-works/, 2013
 
 \end{thebibliography}
 
