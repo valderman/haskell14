@@ -232,10 +232,12 @@ following properties:
         the role of a computational and/or storage resource, tasked with
         servicing client requests rather than driving the program.
   \item The implementation is built as a library on top of the GHC and Haste
-        Haskell compilers, requiring little to no compiler support.
+        Haskell compilers, requiring little to no compiler support. Programs
+        are compiled twice; once with Haste and once with GHC, to produce the
+        final client and server side code respectively.
 \end{itemize}
 
-\subsection{A first example}
+\subsection{A first example}\label{sec:helloserver}
 
 While explaining of the properties of our solution is all well and good,
 nothing compares to a good old Hello World example to convey the idea.
@@ -326,8 +328,11 @@ its entirety.
 Like \lstinline!runClient!, \lstinline!runApp! does not return, and is intended
 to be the only computation executed by \lstinline!main!. In fact, performing
 non-deterministic IO and allowing \lstinline!runApp! or its arguments to
-capture the result may lead to unpredictable behavior. A remedy for this is
-discussed in section \ref{sec:discussion}.
+capture the result may lead to unpredictable behavior. The \lstinline!appMain!
+function should for all intents and purposes be regarded as the program's entry
+point; a non-intrusive method of enforcing this using the type system is
+described in section \ref{sec:limitations}, but is not used in the examples
+given here as it relies on the use of the GHC plugin system.
 
 \begin{listingfloat}
 \begin{code}
@@ -352,7 +357,97 @@ main =
 \caption{A seamless programming model: Hello Server}
 \label{lst:hello-server}
 \end{listingfloat}
- 
+
+\subsection{Using server-side state}
+
+While the Hello Server example illustrates how client-server communication is
+handled, most web applications need to keep some server-side state as well.
+At first glance, this would seem to be a trivial problem; can we not just
+create our state holding elements in \lstinline!main! as usual?
+Figure \ref{lst:bad-state} describes an attempt at a solution using this idea.
+
+\begin{listingfloat}
+\begin{code}
+main = do
+  visitorref <- newIORef 0
+  runApp config $ do
+    count <- export . liftIO $ do
+      atomicModifyIORef visitorref (\v -> (v+1, v+1))
+
+    runClient $ do
+      visitors <- onServer count
+      alert ("Your are visitor #" ++ show visitors)
+\end{code}
+\caption{Server-side state: a misguided first attempt}
+\label{lst:bad-state}
+\end{listingfloat}
+
+While this may at first seem to solve the problem of server-side state, this
+approach raises a number of questions. Does \lstinline!visitorref! live on the
+client or the server, or perhaps on both? What happens if our state holding
+element is initialized to a non-deterministic value, and what if we assign it
+a value on the server and then attempt to read that value on the client?
+Recall that, as explained in section \ref{sec:helloserver}, the function
+passed to \lstinline!runApp! should for all intents and purposes be regarded as
+the program's entry point.
+
+To allow the use of server state while treating the final argument to
+\lstinline!runApp! (from here on always referred to as \lstinline!appMain!)
+as the program's entry point, we may want to allow arbitrary IO computations to
+be lifted into the \lstinline!App! monad:
+
+\begin{code}
+main = runApp config $ do
+  visitorref <- liftIO $ newIORef 0
+  ...
+\end{code}
+
+However, this does not answer the question of where \lstinline!visitorref!
+lives or where any side effects caused by its creation will take place.
+To solve this problem once and for all, we need to introduce a way to lift
+arbitrary IO computations, but ensure that said computations are executed on
+the server and nowhere else. This is accomplished using a more restricted
+version of \lstinline!liftIO!:
+
+\begin{code}
+liftServerIO :: IO a -> App (Useless a)
+\end{code}
+
+In contrast to \lstinline!liftIO!, the result value of \lstinline!liftServerIO!
+is wrapped in the \lstinline!Useless! type. As the name implies, this type is
+completely opaque and thus useless unless you can somehow extract its contained
+value, something which is only possible using a single function:
+
+\begin{code}
+mkUseful :: Useless a -> Server a
+\end{code}
+
+Therein lies the secret to restricting \lstinline!liftServerIO! to the
+server: the only function capable of turning a \lstinline!Useless! value into
+a useful one lives in the server monad. Any client side code is thus free to
+completely ignore executing computations lifted using \lstinline!liftServerIO!;
+since the result of such a computation is never observable on the client,
+the client has no obligation to even produce such a value.
+Figure \ref{lst:good-state} shows how to make proper use of server-side state.
+
+\begin{listingfloat}
+\begin{code}
+main =
+  runApp config $ do
+    uselessref <- liftServerIO $ newIORef 0
+
+    count <- export $ do
+      r <- mkUseful uselessref
+      liftIO $ atomicModifyIORef r (\v -> (v+1, v+1))
+
+    runClient $ do
+      visitors <- onServer count
+      alert ("Your are visitor #" ++ show visitors)
+\end{code}
+\caption{Server-side state: doing it properly}
+\label{lst:good-state}
+\end{listingfloat}
+
 
 \section{Implementation}
 \section{The Haste compiler}
@@ -574,7 +669,7 @@ very non-intrusive, requiring only the use of the normal FFI to import
 Javascript's \lstinline!eval! function; no modification of the compiler is
 needed.
 
-\section{Discussion and related work}\label{sec:discussion}
+\section{Discussion and related work}
 
 \subsection{Related work}
 
@@ -663,6 +758,7 @@ greater flexibility, but also eliminates any potentially hairy interaction with
 compiler internals.
 
 \subsection{Limitations}
+\label{sec:limitations}
 
 \paragraph{Client-centricity} Unlike any of the related works, our approach
 takes a firm stand, regarding the client as the driver in the client-server
@@ -681,7 +777,9 @@ straightforward.
 \paragraph{Preventing divergence} While our solution completely safe from the
 invocation point of the \lstinline!runApp! function onward, capturing
 IO-dependent variables introduced before this invocation may lead to the client
-and server execution paths diverging. Consider the following example:
+and server execution paths diverging. Recall that our solution does not modify
+either of the compilers used. As such, both will produce code to execute all
+computations called by \lstinline!main!. Consider the following example:
 
 \begin{code}
 main = do
