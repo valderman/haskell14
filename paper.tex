@@ -224,7 +224,11 @@ following properties:
   \item Our model takes the view that the client side is the main driver when
         developing web applications and accordingly delegates the server to
         the role of a computational and/or storage resource, tasked with
-        servicing client requests rather than driving the program.
+        servicing client requests rather than driving the program. While it is
+        entirely possible to implement a server-to-client communication channel
+        on top of our model, we believe that choosing one side of the
+        heterogenous client-server relation as the master helps keeping the
+        program flow linear and predictable.
   \item The implementation is built as a library on top of the GHC and Haste
         Haskell compilers, requiring little to no compiler support. Programs
         are compiled twice; once with Haste and once with GHC, to produce the
@@ -423,8 +427,8 @@ Therein lies the secret to restricting \lstinline!liftServerIO! to the
 server: the only function capable of turning a \lstinline!Useless! value into
 a useful one lives in the server monad. Any client side code is thus free to
 completely ignore executing computations lifted using \lstinline!liftServerIO!;
-since the result of such a computation is never observable on the client,
-the client has no obligation to even produce such a value.
+since the result of a server lifted computation is never observable on the
+client, the client has no obligation to even produce such a value.
 Figure \ref{lst:good-state} shows how to make proper use of server-side state.
 
 \begin{listingfloat}
@@ -483,9 +487,10 @@ srvHello :: Useless RcptList -> Server ()
 srvHello uRcpts = do
   recipients <- mkUseful uRcpts
   sid <- getSessionID
-  rcptMVar <- liftIO CC.newEmptyMVar
-  liftIO $ CC.modifyMVar recipients $ \cs -> do
-    return ((sid, rcptMVar):cs ,())
+  liftIO $ do
+    rcptMVar <- CC.newEmptyMVar
+    CC.modifyMVar recipients $ \cs ->
+      return ((sid, rcptMVar):cs ,())
 \end{code}
 
 The handshake is a simple operation; the connecting client just gets an
@@ -501,9 +506,7 @@ srvSend uRcpts message = do
       recipients <- CC.withMVar rcpts return
       mapM_ (CC.forkIO . deliver message) recipients
   where
-    deliver :: String -> Recipient -> IO ()
-    deliver message (_, rcptMVar) =
-      CC.putMVar rcptMVar message
+    deliver msg (_, rcptMVar) = CC.putMVar rcptMVar msg
 \end{code}
 
 The send function is slightly more complex. The incoming message is written to
@@ -521,7 +524,7 @@ srvAwait uRcpts = do
     recipients <- CC.withMVar rcpts return
     case find ((== sid) . fst) recipients of
       Just (_, mv) -> CC.takeMVar mv
-      _            -> fail "Unregistered session; aborting"
+      _            -> fail "Unregistered session!"
 \end{code}
 
 The final server operation, notifying users of pending messages, finds the
@@ -530,6 +533,89 @@ session identifier of the calling user, and then blocks until a message arrives
 in said \lstinline!MVar!. This is a little different from the other two
 operations, which perform their work as quickly as possible and then return
 immediately.
+
+If the caller's session identifier could not be found in the
+recipient list, it has for some reason not completed its handshake with the
+server. If this is the case, we simply drop the session by throwing an error;
+the session will be automatically cleaned up on the server side and an exception
+is thrown to the client.
+
+Having implemented our three server operations, all that's left is to tie them
+to the client. We start by creating an \lstinline!MVar! to hold the server
+state and exporting our three server operations.
+
+\begin{code}
+appMain :: App Done
+appMain = do
+  recipients <- liftServerIO $ CC.newMVar []
+
+  hello <- export $ srvHello recipients
+  awaitMsg <- export $ srvAwait recipients
+  sendMsg <- export $ srvSend recipients
+
+  runClient $ do
+    withElems ["log","message"] $ \[log,msgbox] -> do
+      onServer hello
+\end{code}
+
+Notice that the \lstinline!recipients! list is passed to our three server
+operations \emph{before} they are exported; since \lstinline!recipients! is
+created on the server and inaccessible to the client side, it is not possible
+to pass it over the network as an RPC argument. Even if it were possible,
+passing server-private state back and forth over the network would be highly
+undesirable.
+
+The \lstinline!withElems! function is part of Haste's DOM manipulation library;
+it locates references to the DOM nodes with the given identifiers, in this case
+the variable \lstinline!log! is bound to the node with the identifier ``log'',
+and \lstinline!inp! is bound to the node identifier by ``msg''. These are the
+same DOM nodes that were referenced in our original example, and refer
+to the chat log window and the text input field respectively. After locating
+all the needed UI elements, the client proceeds to register itself with the
+server's recipient list using the \lstinline!hello! export.
+
+\begin{code}
+      let recvLoop chatlines = do
+            setProp log "value" $ unlines chatlines
+            message <- onServer awaitMsg
+            recvLoop (message : chatlines)
+      fork $ recvLoop []
+\end{code}
+
+The \lstinline!recvLoop! function perpetually asks the server for new messages
+and updates the chat log whenever one arrives. Note that unlike the
+\lstinline!onmessage! callback of the Javascript version of this example,
+\lstinline!recvLoop! is acting as a completely self-contained process with
+linear program flow, keeping track of its own state and only reaching out to
+the outside world to write its state to the chat log whenever necessary. As
+the \lstinline!awaitMsg! function blocks until a message arrives,
+\lstinline!recvLoop! will make exactly one iteration per received message.
+
+\begin{code}
+      msgbox `onEvent` OnKeyPress $ \13 -> do
+        msg <- getProp msgbox "value"
+        setProp msgbox "value" ""
+        onServer (sendMsg <.> msg)
+\end{code}
+
+This is the final part of our program; we set up an event handler to clear the
+input box and send its contents off to the server whenever the user hits return
+(character code 13) while the input box has focus. Finally, all that is left
+is to actually launch our application.
+
+\begin{code}
+main :: IO ()
+main =
+  runApp (mkConfig "ws://localhost:1111" 1111) appMain
+\end{code}
+
+Using this approach, creating web applications with strongly typed
+communication becomes easy. The discerning reader may be slightly annoyed at
+the need to extract the contents from \lstinline!Useless! values at each point
+of use. Indeed, in a simple example such as this, the source clutter caused by
+this becomes a disproportionate irritant. Fortunately, most web applications
+tend to have more complex client-server interactions, reducing this overhead
+significantly.
 
 \section{Implementation}
 
@@ -971,7 +1057,7 @@ transmitted and where a particular piece of code is executed, and the ability to
 effortlessly share code between the client and the server.
 
 Our model is based on a simple blocking concurrency model rather than explicit
-continuations, is well suited for use with a GUI programming style based on
+continuations which is well suited for use with a GUI programming style based on
 communicating processes with local state, and requires essentially no
 modification of existing tools or compilers.
 

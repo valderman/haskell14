@@ -21,9 +21,7 @@ srvSend uRcpts message = do
       recipients <- CC.withMVar rcpts return
       mapM_ (CC.forkIO . deliver message) recipients
   where
-    deliver :: String -> Recipient -> IO ()
-    deliver message (_, rcptMVar) =
-      CC.putMVar rcptMVar message
+    deliver msg (_, rcptMVar) = CC.putMVar rcptMVar msg
 
 srvAwait :: Useless RcptList -> Server String
 srvAwait uRcpts = do
@@ -43,18 +41,21 @@ appMain = do
   awaitMsg <- export $ srvAwait recipients
   sendMsg <- export $ srvSend recipients
 
-  runClient $ withElems ["log", "message"] $ \[log, msgbox] -> do
-    onServer hello
+  runClient $ do
+    withElems ["log","message"] $ \[log,msgbox] -> do
+      onServer hello
 
-    mbox <- statefully [] $ \oldlines newline -> do
-      setProp log "value" $ unlines $ newline:oldlines
-      return . Just $ newline:oldlines
-    fork . forever $ mbox <! onServer awaitMsg
+      let rcvLoop chatlines = do
+            setProp log "value" $ unlines chatlines
+            message <- onServer awaitMsg
+            rcvLoop (message : chatlines)
+      fork $ rcvLoop []
     
-    msgbox `onEvent` OnKeyPress $ \13 -> do
-      msg <- getProp msgbox "value"
-      onServer (sendMsg <.> msg)
-      setProp msgbox "value" ""
+      msgbox `onEvent` OnKeyPress $ \13 -> do
+        msg <- getProp msgbox "value"
+        setProp msgbox "value" ""
+        onServer (sendMsg <.> msg)
 
 main :: IO ()
-main = runApp (mkConfig "ws://localhost:1111" 1111) appMain
+main =
+  runApp (mkConfig "ws://localhost:1111" 1111) appMain
