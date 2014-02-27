@@ -113,15 +113,7 @@ significant server component. This component is usually implemented as a
 completely separate program, and communicates with the client code over some
 network protocol.
 
-Having your application rely on some network protocol for
-its internal functionality involves writing a lot of boilerplate network code
-and some serious advance planning of your application's features to be able to
-design a suitable protocol, hampering incremental development. Were we to
-discount this initial design burden, ensuring that the protocol is used
-correctly throughout the code base as the application evolves and gains new
-features would still put an ever increasing burden on the developer.
-
-This state of things is not a concious design choice - most web applications
+This state of things is not a conscious design choice - most web applications
 are conceptually a single entity, not two programs which just happen to talk
 to each other over a network - but a consequence of there being a large,
 distributed network between the client and server parts.
@@ -129,11 +121,12 @@ However, such implementation details should not be allowed to dictate the way
 we structure and reason about our applications - clearly, an abstraction is
 called for.
 
-To put make all a bit more concrete, let's take a look at an example. Let's say
-what we want to implement a simple ``chatbox'' component for a website, to allow
-visitors to discuss the site's content in real time. Using mainstream
-development practives and recent technologies such as WebSockets, we may come
-up with something like the program in figure \ref{lst:javascript-client}.
+To put make the problem a bit more concrete, let's take a look at an example.
+Let's say what we want to implement a simple ``chatbox'' component for a
+website, to allow visitors to discuss the site's content in real time. Using
+mainstream development practives and recent technologies such as WebSockets,
+we may come up with something like the program in figure
+\ref{lst:javascript-client}.
 
 \begin{listingfloat}
 \begin{code}
@@ -178,7 +171,8 @@ Messages are transmitted as strings, with the initial four characters
 indicating the type of the message and the rest being the optional payload.
 There are only two messages; a handshake indicating that a user wants to join
 the conversation, and a broadcast message which sends a line of text to all
-connected users via the server.
+connected users via the server. The only messages received from the server are
+new chat messages, delivered as simple strings.
 
 This code looks solid enough by web standards, but even this simple piece of
 code contains no less than three asynchronous callbacks, two of which both read
@@ -190,7 +184,7 @@ Moreover, this code is not very extensible. If this simple application is to be
 enhanced with new features down the road, the network protocol will clearly
 need to be redesigned. However, if we were developing this application for a
 client, said client would likely not want to pay the added cost for the design
-and implementation of features she did not ask for, and perhaps never will.
+and implementation of features she did not - and perhaps never will - ask for.
 
 Should the protocol need updating in the future, how much time will we need to
 spend on ensuring that the protocol is used properly across our entire program,
@@ -453,7 +447,8 @@ main =
 
 \subsection{The chatbox, revisited}
 
-
+Now that we have seen how to implement both network communication, we are ready
+to revisit the chatbox program, this time using our improved programming model.
 
 \section{Implementation}
 
