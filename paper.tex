@@ -92,9 +92,9 @@ introduces new possibilities for defects, adds development overhead and
 prevents code reuse.
 
 Several attempts have been made at tackling this problem, but none is, in our
-view, satisfactory. In this paper, we propose a programming model in which a
-web application is written as a single program from which client and server
-binaries are generated during compilation. Type annotations in the source
+view, satisfactory. In this paper, we propose a functional programming model in
+which a web application is written as a single program from which client and
+server binaries are generated during compilation. Type annotations in the source
 program control which parts are executed on the server and which are executed
 on the client, and the two communicate using type safe RPC calls. Functions
 which are not explicitly declared as server-side or client-side are usable by
@@ -235,10 +235,12 @@ following properties:
         Haskell compilers, requiring little to no compiler support.
 \end{itemize}
 
-\paragraph{A first example} While explaining of the properties of our solution
-is all well and good, nothing compares to a good old Hello World example to
-convey the idea. We begin by implementing a function which prints a greeting
-to the server's console.
+\subsection{A first example}
+
+While explaining of the properties of our solution is all well and good,
+nothing compares to a good old Hello World example to convey the idea.
+We begin by implementing a function which prints a greeting to the server's
+console.
 
 \begin{code}
 import Haste.App
@@ -362,13 +364,15 @@ extended as part of this work. Haste builds on the GHC compiler to provide
 the full Haskell language, including most GHC-specific extensions, in the
 browser.
 
-\paragraph{Choosing a compiler} Haste is by no means the only
-Javascript-targeting compiler for a purely functional language. In particular,
-the GHC-based GHCJS\ \cite{ghcjs} and UHC\ \cite{uhc} compilers are both
-capable of compiling standard Haskell into Javascript; the Fay\ \cite{fay}
-language was designed from the ground up to target the web space using a subset
-of Haskell; and there exist solutions for compiling Erlang\ \cite{jserlang} and
-Clean\ \cite{jsclean} to Javascript as well.
+\subsection{Choosing a compiler}
+
+Haste is by no means the only Javascript-targeting compiler for a purely
+functional language. In particular, the GHC-based GHCJS\ \cite{ghcjs} and
+UHC\ \cite{uhc} compilers are both capable of compiling standard Haskell into
+Javascript; the Fay\ \cite{fay} language was designed from the ground up to
+target the web space using a subset of Haskell; and there exist solutions for
+compiling Erlang\ \cite{jserlang} and Clean\ \cite{jsclean} to Javascript as
+well.
 
 In the face of this multitude of options, why did we settle on Haste? We make
 the following demands of a candidate source language:
@@ -403,11 +407,12 @@ most of our abstractions, both the cooperative multitasking and the type-safe
 client-server communication itself, are easily expressed as monads, well
 supported in Haskell thanks to do-notation, the choice fell to Haste.
 
-\paragraph{Design of the Haste compiler} Haste is first and foremost intended
-to be a practical compiler; the ability to produce code which is lean and fast
-enough to be used in the real world is critical. To this end, we make several
-design choices and tradeoffs, some of which would be viewed as detrimental in a
-more purist context.
+\subsection{Design of the Haste compiler}
+
+Haste is first and foremost intended to be a practical compiler; the ability
+to produce code which is lean and fast enough to be used in the real world is
+critical. To this end, we make several design choices and tradeoffs, some of
+which would be viewed as detrimental in a more purist context.
 
 One such tradeoff is the decision to make use of the facilities provided by the
 web browser - most prominently the Javascript engine's native garbage
@@ -424,13 +429,15 @@ GHCJS takes the opposite view, that faithful emulation of the GHC runtime is
 paramount. Of course, this brings an impressive degree of compatibility, at the
 cost of the blowup in code size mentioned previously.
 
-\paragraph{Implementation} As previously mentioned, Haste offloads much of the
-heavy lifting of compilation - parsing, type checking, intermediate code
-generation and many optimizations - onto GHC, and takes over code generation
-after the STG generation step, at the very end of the compilation process.
-STG\ \cite{stg} is the last intermediate representation used by GHC before
-the final code generation takes place and has several benefits for use as
-Haste's target language:
+\subsection{Implementation overview}
+
+As previously mentioned, Haste offloads much of the heavy lifting of
+compilation - parsing, type checking, intermediate code generation and many
+optimizations - onto GHC, and takes over code generation after the STG
+generation step, at the very end of the compilation process. STG\ \cite{stg} is
+the last intermediate representation used by GHC before the final code
+generation takes place and has several benefits for use as Haste's target
+language:
 
 \begin{itemize}
   \item STG is still a functional intermediate representation, based on the
@@ -467,6 +474,8 @@ Haste's target language:
 In light of its heavy reliance on STG, it may be more correct to categorize
 Haste as an STG compiler rather than a Haskell compiler.
 
+\subsection{Data representation}
+
 The runtime data representation of Haste programs is kept as close to regular
 Javascript programs as possible. The numeric types are represented using the
 Javascript \lstinline!Number! type, which is defined as the IEEE754 double
@@ -493,19 +502,22 @@ however, functions may be curried. For such cases where the arity of an applied
 function can not be determined statically, application is implemented using the
 eval/apply method described in \cite{fastcurry} instead.
 
-\paragraph{Interfacing with Javascript} While Haste supports the Foreign
-Function Interface inherited from GHC, with its usual features and limitations
-\ \cite{ffi}, it is often impractical to work within the confines of an
-interface designed for communication on a very low level. For this reason
-Haste sports its own method for interacting with Javascript as well, which
-allows the programmer to pass any value back and forth between Haskell and
-Javascript, as long as she can come up with a way to translate this value
-between its Haskell and Javascript representations. Of course, not performing
-any translation at all is also a valid ``translation'', which allows Haskell
-code to store any Javascript value for later retrieval without inspecting it
-and vice versa. The following example implements mutable variables using this
-custom Javascript interface.
+\subsection{Interfacing with Javascript}
 
+While Haste supports the Foreign Function Interface inherited from GHC, with
+its usual features and limitations \ \cite{ffi}, it is often impractical to
+work within the confines of an interface designed for communication on a very
+low level. For this reason Haste sports its own method for interacting with
+Javascript as well, which allows the programmer to pass any value back and
+forth between Haskell and Javascript, as long as she can come up with a way to
+translate this value between its Haskell and Javascript representations.
+Of course, not performing any translation at all is also a valid
+``translation'', which allows Haskell code to store any Javascript value for
+later retrieval without inspecting it and vice versa. The example given in
+figure \ref{lst:ffi} implements mutable variables using this custom Javascript
+interface.
+
+\begin{listingfloat}
 \begin{code}
 import Haste.Foreign
 
@@ -528,6 +540,9 @@ setMutable = ffi "(function(m, x) {m.val = x;})"
 getMutable :: Marshal a => MutableVar a -> IO a
 getMutable = ffi "(function(m) {return m.val;})"
 \end{code}
+\caption{Mutable variables with \lstinline!Haste.Foreign!}
+\label{lst:ffi}
+\end{listingfloat}
 
 The core of this interface consists of the \lstinline!ffi! function, which
 allows the programmer to create a Haskell function from arbitrary Javascript
@@ -560,6 +575,8 @@ Javascript's \lstinline!eval! function; no modification of the compiler is
 needed.
 
 \section{Discussion and related work}\label{sec:discussion}
+
+\subsection{Related work}
 
 Other approaches to this problem exist, notably in the form of the
 Conductance\ \cite{conductance}, Duetto\ \cite{duetto} and
@@ -645,8 +662,10 @@ would be entirely straightforward. This implementation not only allows for
 greater flexibility, but also eliminates any potentially hairy interaction with
 compiler internals.
 
-\paragraph{Limitations} Unlike any of the related works, our approach takes a
-firm stand, regarding the client as the driver in the client-server
+\subsection{Limitations}
+
+\paragraph{Client-centricity} Unlike any of the related works, our approach
+takes a firm stand, regarding the client as the driver in the client-server
 relationship with the server taking on the role of a passive computational
 or storage resource. The server may thus not call back into the client at
 arbitrary points but is instead limited to returning answers to client-side
@@ -659,10 +678,10 @@ insufficiently expressive, extending our existing model with an
 \lstinline!onClient! counterpart to \lstinline!onServer! would be relatively
 straightforward.
 
-While our solution completely safe from the invocation point of the
-\lstinline!runApp! function onward, capturing IO-dependent variables introduced
-before this invocation may lead to the client and server execution paths
-diverging. Consider the following example:
+\paragraph{Preventing divergence} While our solution completely safe from the
+invocation point of the \lstinline!runApp! function onward, capturing
+IO-dependent variables introduced before this invocation may lead to the client
+and server execution paths diverging. Consider the following example:
 
 \begin{code}
 main = do
@@ -706,6 +725,18 @@ this problem is unaffected by changing the type of the program's entry point.
 While this is indeed true, we feel that since it is quite possible to break
 any Haskell program using \lstinline!unsafePerformIO!, even subverting the type
 system, this is not a problem with our solution.
+
+\paragraph{Environment consistency} As our programming model uses two different
+compilers to generate client and server code, it is crucial to keep the package
+environments of the two in sync. A situation where, for instance, a module is
+visible to one compiler but not to the other will render many programs
+uncompilable until this inconsistency is fixed.
+
+This kind of divergence can be worked around using conditional compilation, but
+is highly problematic even so; using a unified package database between the two
+compilers, while problematic due to the differing natures of native and
+Javascript compilation respectively, would be a significant improvement in this
+area.
 
 \section{Future work}
 
