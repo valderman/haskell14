@@ -763,9 +763,10 @@ Any and all communication between client and server is both strongly typed
 and made explicit by the use of the \lstinline!onServer! function, with the
 programmer having complete control over the serialization and de-serialization
 of data using the appropriate type classes. Aside from the obvious advantages
-of type safety, making the crossing of the network boundary explicit helps the
-programmer make an informed decision as to when and where server communication
-is appropriate.
+of type safety, making the crossing of the network boundary explicit aids the
+programmer in making an informed decision as to when and where server
+communication is appropriate, as well as helps prevents accidental transmission
+of sensitive information intended to stay on the client.
 
 Our programming model is implemented as a library, assuming only two Haskell
 compilers, one targeting Javascript and one targeting the programmer's server
@@ -885,6 +886,18 @@ way to further improve the programmability of web-based distributed
 applications.
 
 \section{Conclusion}
+
+We have presented a programming model which improves on the current state of
+the art in client-server web application development. In particular, our
+solution combines type safe communication between the client and the server
+with purely functional semantics, clear demarcations as to when data is
+transmitted and where a particular piece of code is executed, and the ability to
+effortlessly share code between the client and the server.
+
+Our model is based on a simple blocking concurrency model rather than explicit
+continuations, is well suited for use with a GUI programming style based on
+communicating processes with local state, and requires essentially no
+modification of existing tools or compilers.
 
 \acks
 
