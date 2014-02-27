@@ -143,7 +143,7 @@ function chat(sock, msg) {sock.send('text' + msg);}
 window.onload = function() {
   var logbox = document.getElementById('log');
   var msgbox = document.getElementById('message');
-  var sock = new WebSocket('ws://example.com:24601');
+  var sock = new WebSocket('ws://example.com);
 
   sock.onmessage = function(e) {
     logbox.value = e.data + NEWLINE + logbox.value;
@@ -203,6 +203,135 @@ Above all, is it really necessary for such a simple program to involve
 client/server architectures and network protocol design at all?
 
 \section{A seamless programming model}
+
+There are many conveivable improvements to the mainstream web development model
+described in the previous section. We propose an alternative programming model
+based on Haskell, in which web applications are written as monolithic entities
+rather than as two independent parts that just so happen to talk to each other.
+
+Our proposed model, dubbed ``Haste.App'' in an ingenious attempt at
+capitalizing on the recent popularity of the ``app'' buzzword, has the
+following properties:
+
+\begin{itemize}
+  \item The programming model is synchronous, giving the programmer a simple,
+        linear view of the program flow, eliminating the need to program with
+        callbacks and continuations.
+  \item Side-effecting code is explicitly designated to run on either the
+        client or the server using the type system while pure code can be
+        shared by both. Additionally, both client and server code may lift
+        general IO computations, allowing for safe IO code reuse within the
+        confines of the client or server designated code sections.
+  \item Client-server network communication is handled through statically typed
+        RPC function calls, extending the reach of Haskell's type checker over
+        the network and giving the programmer advance warning when she uses
+        network services incorrectly or forgets to update communication code
+        as the application's internal protocol changes.
+  \item The implementation is built as a library on top of the GHC and Haste
+        Haskell compilers, requiring little to no compiler support.
+\end{itemize}
+
+\paragraph{A first example} While explaining of the properties of our solution
+is all well and good, nothing compares to a good old Hello World example to
+convey the idea. We begin by implementing a function which prints a greeting
+to the server's console.
+
+\begin{code}
+import Haste.App
+
+helloServer :: String -> Server ()
+helloServer name =
+  liftIO $ putStrLn (name ++ " says hello!")
+\end{code}
+
+Computations exclusive to the server side live in the \lstinline!Server! monad.
+This is basically an IO monad with a few extra operations for session handling;
+its main purpose is to prevent the programmer from accidentally attempting to
+perform client-exclusive operations, such as popping up a browser dialog box,
+on the server.
+
+Next, we need to make the \lstinline!helloServer! function available as an RPC
+function and call it from the client.
+
+\begin{code}
+appMain :: App Done
+appMain = do
+  greetings <- export helloServer
+
+  runClient $ do
+    name <- prompt "Hi there, what is your name?"
+    onServer (greetings <.> name)
+\end{code}
+
+The \lstinline!export! function takes an arbitrary function, provided that all
+its arguments as well as its return value are serializable through the aptly
+named \lstinline!Serializable! type class, and returns a typed ``handle'' of
+sorts. In this example, the type of \lstinline!greetings! is
+\lstinline!Export (String -> Server ())!, indicating that the handle identifies
+an exported function with a single \lstinline!String! argument and no return
+value; exported functions all live in the \lstinline!Server! monad.
+
+In order to make an RPC call using this handle, we must supply it with an
+argument. This is done using the \lstinline!<.>! operator. Upon closer
+inspection, the attentive reader may notice that its type,
+\linebreak
+\lstinline!Serialize a => Export (a -> b) -> a -> Export b!,
+is very similar to the type of the \lstinline!<*>! operator over applicative
+functors. This is not a coincidence; the \lstinline!<.>! performs the same role
+for the \lstinline!Export! type as \lstinline!<*>! performs for applicative
+functors. The reason for using a separate operator for this instead of making
+\lstinline!Export! an instance of \lstinline!Applicative! is that since
+functions embedded in the \lstinline!Export! type exist only to be called over
+a network, such functions must only be applied to arguments which can be
+serialized and sent over a network connection.
+
+After applying the value obtained by \lstinline!prompt!ing the user for her
+name to the exported function, we apply the \lstinline!onServer! function to
+the result, which dispatches the RPC call to the server. \lstinline!onServer!
+will then block until the RPC call returns.
+
+Finally, we need to launch our application, and inform the client part of the
+whereabouts of its server counterpart; in this example the server will listen
+on port 1111, and since we will only run this application locally the client
+should attempt to contact the server at our local machine.
+
+\begin{code}
+main :: IO ()
+main =
+  runApp (mkConfig "ws://localhost:1111" 1111) appMain
+\end{code}
+
+This part is entirely straightforward; the URL of the server is provided for
+the benefit of the client and the port to listen on is provided for the
+benefit of the server. The final argument is the main function of our
+application. Figure \ref{lst:hello-server} gives the code of this example in
+its entirety.
+
+\begin{listingfloat}
+\begin{code}
+import Haste.App
+
+helloServer :: String -> Server ()
+helloServer name =
+  liftIO $ putStrLn (name ++ " says hello!")
+
+appMain :: App Done
+appMain = do
+  greetings <- export helloServer
+
+  runClient $ do
+    name <- prompt "Hi there, what is your name?"
+    onServer (greetings <.> name)
+
+main :: IO ()
+main =
+  runApp (mkConfig "ws://localhost:1111" 1111) appMain
+\end{code}
+\caption{A seamless programming model: Hello Server}
+\label{lst:hello-server}
+\end{listingfloat}
+ 
+
 \section{Implementation}
 \section{The Haste compiler}
 
@@ -546,9 +675,10 @@ start the application by invoking \lstinline!runApp config appMain!, where
 \lstinline!config! contains the URL and port configuration for the server, given
 by the programmer using a compiler flag. As this modification only affects the
 program's entry point, which is already given ``special'' treatment in Haskell
-compilers, we believe this to be a practical, non-intrusive way to remove this
-limitation, and in fact made this modification to the Haste compiler for our
-implementation.
+compilers, and may even be implemented using the plugin mechanism of GHC,
+requiring no modification of the compiler code at all, we believe this to be a
+practical, non-intrusive way to remove this limitation, and are planning on
+including this modification in our implementation.
 
 The astute reader may notice that the same applies to code using
 \lstinline!unsafePerformIO! to declare IO-dependent top-level values, and that
