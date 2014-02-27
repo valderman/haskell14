@@ -301,7 +301,10 @@ functors. The reason for using a separate operator for this instead of making
 \lstinline!Export! an instance of \lstinline!Applicative! is that since
 functions embedded in the \lstinline!Export! type exist only to be called over
 a network, such functions must only be applied to arguments which can be
-serialized and sent over a network connection.
+serialized and sent over a network connection. When an \lstinline!Export!
+function is applied to an argument using \lstinline!<.>!, the argument is
+serialized and stored inside the resulting \lstinline!Export! object, awaiting
+dispatch.
 
 After applying the value obtained by \lstinline!prompt!ing the user for her
 name to the exported function, we apply the \lstinline!onServer! function to
@@ -448,8 +451,23 @@ main =
 \label{lst:good-state}
 \end{listingfloat}
 
+\subsection{The chatbox, revisited}
+
+
 
 \section{Implementation}
+
+\begin{itemize}
+  \item Poor man's concurrency monad
+  \item Conditional compilation
+  \item Printf trick to turn export into [JSON] -> f
+  \item JSON over WebSockets used for transport
+  \item Server event loop awaits commands, dispatches functions, sends data back
+  \item Client sends command with nonce and blocks on MVar, event loop fills
+        MVar when return value with proper nonce arrives
+  \item Throw away unused stuff on client
+\end{itemize}
+
 \section{The Haste compiler}
 
 In order to allow the same language to be used on both client and server, we
