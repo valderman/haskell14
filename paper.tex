@@ -245,10 +245,11 @@ helloServer name =
 \end{code}
 
 Computations exclusive to the server side live in the \lstinline!Server! monad.
-This is basically an IO monad with a few extra operations for session handling;
-its main purpose is to prevent the programmer from accidentally attempting to
-perform client-exclusive operations, such as popping up a browser dialog box,
-on the server.
+This is basically an IO monad, as can be seen from the regular
+\lstinline!putStrLn! \lstinline!IO! computation being lifted into it, with a
+few extra operations for session handling; its main purpose is to prevent the
+programmer from accidentally attempting to perform client-exclusive operations,
+such as popping up a browser dialog box, on the server.
 
 Next, we need to make the \lstinline!helloServer! function available as an RPC
 function and call it from the client.
@@ -271,11 +272,20 @@ sorts. In this example, the type of \lstinline!greetings! is
 an exported function with a single \lstinline!String! argument and no return
 value; exported functions all live in the \lstinline!Server! monad.
 
-In order to make an RPC call using this handle, we must supply it with an
-argument. This is done using the \lstinline!<.>! operator. Upon closer
-inspection, the attentive reader may notice that its type,
+After the \lstinline!export! call, we enter the domain of client-exclusive code
+with the application of \lstinline!runClient!. This function, unsurprisingly,
+execute computations in the \lstinline!Client! monad which is essentially an
+IO monad with cooperative multitasking added on top, to mitigate the fact that
+Javascript has no native concurrency support. \lstinline!runClient! does not
+return, and is the only function with a return type of \lstinline!App Done!,
+which ensures that each \lstinline!App! computation contains exactly one client
+computation.
+
+In order to make an RPC call using a handle obtained from \lstinline!export!,
+we must supply it with an argument. This is done using the \lstinline!<.>!
+operator. Upon closer inspection, the attentive reader may notice that
 \linebreak
-\lstinline!Serialize a => Export (a -> b) -> a -> Export b!,
+its type, \lstinline!Serialize a => Export (a -> b) -> a -> Export b!,
 is very similar to the type of the \lstinline!<*>! operator over applicative
 functors. This is not a coincidence; the \lstinline!<.>! performs the same role
 for the \lstinline!Export! type as \lstinline!<*>! performs for applicative
@@ -306,6 +316,12 @@ the benefit of the client and the port to listen on is provided for the
 benefit of the server. The final argument is the main function of our
 application. Figure \ref{lst:hello-server} gives the code of this example in
 its entirety.
+
+Like \lstinline!runClient!, \lstinline!runApp! does not return, and is intended
+to be the only computation executed by \lstinline!main!. In fact, performing
+non-deterministic IO and allowing \lstinline!runApp! or its arguments to
+capture the result may lead to unpredictable behavior. A remedy for this is
+discussed in section \ref{sec:discussion}.
 
 \begin{listingfloat}
 \begin{code}
@@ -539,7 +555,7 @@ very non-intrusive, requiring only the use of the normal FFI to import
 Javascript's \lstinline!eval! function; no modification of the compiler is
 needed.
 
-\section{Discussion and related work}
+\section{Discussion and related work}\label{sec:discussion}
 
 Other approaches to this problem exist, notably in the form of the
 Conductance\ \cite{conductance}, Duetto\ \cite{duetto} and
