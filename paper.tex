@@ -133,32 +133,38 @@ To put this all into perspective, let's take a look at the completely fictious
 case of Jen, a software developer tasked with implementing a simple ``chatbox''
 for a client's web site. Jen is a senior developer, but has no previous
 experience with web applications. She is, however, a competend engineer and a
-fast learner, and so manages to produce the following piece of client-side code.
+fast learner, and so manages to produce the following client-side code in
+figure \ref{lst:javascript-client}.
 
+\begin{listingfloat}
 \begin{code}
 function handshake(sock) {sock.send('helo');}
 function chat(sock, msg) {sock.send('text' + msg);}
 
 window.onload = function() {
-    var logbox = document.getElementById('log');
-    var msgbox = document.getElementById('message');
-    var sock = new WebSocket('ws://example.com:24601');
+  var logbox = document.getElementById('log');
+  var msgbox = document.getElementById('message');
+  var sock = new WebSocket('ws://example.com:24601');
 
-    sock.onmessage = function(e) {
-        logbox.value = e.data + NEWLINE + logbox.value;
-    };
+  sock.onmessage = function(e) {
+    logbox.value = e.data + NEWLINE + logbox.value;
+  };
 
-    sock.onopen = function(e) {
-        handshake(sock);
-        msgbox.addEventListener('keydown', function(e) {
-            if(e.keyCode == 13) {
-                var msg = msgbox.value;
-                msgbox.value = '';
-            }
-        });
-    };
+  sock.onopen = function(e) {
+    handshake(sock);
+    msgbox.addEventListener('keydown', function(e) {
+      if(e.keyCode == 13) {
+        var msg = msgbox.value;
+        msgbox.value = '';
+        chat(msg);
+      }
+    });
+  };
 };
 \end{code}
+\caption{Javascript chatbox implementation}
+\label{lst:javascript-client}
+\end{listingfloat}
 
 Since the ``chatbox'' application is very simple - users should only be able to
 send and receive text messages in real time - Jen opts for a very simple
@@ -179,14 +185,18 @@ The code looks solid enough, but Jen is not happy. This simple piece of code
 contains no less than three asynchronous callbacks, making the program flow
 non-obvious. Moreover, she is concerned about the network communication. The
 protocol will clearly need to be redesigned if the application is to be
-upgraded with new features later, but the client is not willing to pay Jen to
+enhanced with new features later, but the client is not willing to pay Jen to
 spend development time on features he has not requested and perhaps never will.
+
 If the protocol will need to be updated in the future, how much time will Jen
 need to spend on ensuring that all code using the network protocol stays
-updated? Then there is the server component to think; of how much extra work
-will it take to ensure that the two code bases stay in sync? Coming from a
-desktop background, Jen wonders why something so seemingly simple should
-involve client/server architectures and network protocols at all.
+updated? Then there is the server component to think of; how much extra work
+will it take to ensure that the two code bases stay in sync? How much code
+will need to be written twice, one version for the client and one for the
+server, due to the unfortunate fact that the two can't share any code?
+
+Coming from a desktop background, Jen wonders why something so seemingly simple
+should involve client/server architectures and network protocols at all.
 
 \section{A seamless programming model}
 \section{Implementation}
