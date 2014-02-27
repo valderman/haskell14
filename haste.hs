@@ -1,7 +1,7 @@
+import Data.List
 import Haste.App
-import Haste.App.Concurrent as HC
+import Haste.App.Concurrent
 import qualified Control.Concurrent as CC
-import qualified Data.List as L
 
 main = runApp (defaultConfig "ws://localhost:24601" 24601) $ do
   clients <- liftServerIO $ CC.newMVar []
@@ -16,7 +16,7 @@ main = runApp (defaultConfig "ws://localhost:24601" 24601) $ do
     sid <- getSessionID
     liftIO $ do
       cs <- CC.withMVar clients return
-      case L.find ((== sid) . fst) cs of
+      case find ((== sid) . fst) cs of
         Just (_, mv) -> CC.takeMVar mv
         _            -> fail "Client did not say hello - abort session!"
 
@@ -27,10 +27,10 @@ main = runApp (defaultConfig "ws://localhost:24601" 24601) $ do
   runClient $ withElems ["log", "message"] $ \[log, msgbox] -> do
     onServer hello
 
-    mbox <- HC.statefully [] $ \oldlines newline -> do
+    mbox <- statefully [] $ \oldlines newline -> do
       setProp log "value" $ unlines $ newline:oldlines
       return . Just $ newline:oldlines
-    HC.fork . forever $ mbox <! onServer awaitMsg
+    fork . forever $ mbox <! onServer awaitMsg
     
     msgbox `onEvent` OnKeyPress $ \13 -> do
       getProp msgbox "value" >>= onServer . (sendMsg <.>)
