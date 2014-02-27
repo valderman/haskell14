@@ -449,6 +449,87 @@ main =
 
 Now that we have seen how to implement both network communication, we are ready
 to revisit the chatbox program, this time using our improved programming model.
+Since we are now writing the entire application, both client and server, as
+opposed to the client part from our motivating example, our program has three
+new responsibilities.
+
+\begin{itemize}
+  \item We need to add connecting users to a list of message recipients;
+  \item users leaving the site need to be removed from the recipient list; and
+  \item chat messages need to be distributed to all users in the list.
+\end{itemize}
+
+With this in mind, we begin by importing a few modules we are going to need and
+define the type for our recipient list.
+
+\begin{code}
+import Data.List (find)
+import Haste.App
+import Haste.App.Concurrent
+import qualified Control.Concurrent as CC
+
+type Recipient = (SessionID, CC.MVar String)
+type RcptList = CC.MVar [Recipient]
+\end{code}
+
+We use an \lstinline!MVar! from \lstinline!Control.Concurrent! to store the
+list of recipients. A recipient will be represented by a \lstinline!SessionID!,
+an ID used by Haste.App to identify user sessions, and an \lstinline!MVar! into
+which new chat messages sent to the recipient will be written. Next, we define
+our handshake RPC function.
+
+\begin{code}
+srvHello :: Useless RcptList -> Server ()
+srvHello uRcpts = do
+  recipients <- mkUseful uRcpts
+  sid <- getSessionID
+  rcptMVar <- liftIO CC.newEmptyMVar
+  liftIO $ CC.modifyMVar recipients $ \cs -> do
+    return ((sid, rcptMVar):cs ,())
+\end{code}
+
+The handshake is a simple operation; the connecting client just gets an
+\lstinline!MVar! associated with its session identifier, and the two are then
+prepended to the recipient list. Notice how the application's server state is
+passed in as the function's first \lstinline!Useless RcptList! argument.
+
+\begin{code}
+srvSend :: Useless RcptList -> String -> Server ()
+srvSend uRcpts message = do
+    rcpts <- mkUseful uRcpts
+    liftIO $ do
+      recipients <- CC.withMVar rcpts return
+      mapM_ (CC.forkIO . deliver message) recipients
+  where
+    deliver :: String -> Recipient -> IO ()
+    deliver message (_, rcptMVar) =
+      CC.putMVar rcptMVar message
+\end{code}
+
+The send function is slightly more complex. The incoming message is written to
+the \lstinline!MVar! corresponding to each active session. Note the use of
+\lstinline!forkIO!. Some recipients may be slow to empty their \lstinline!MVar!
+to make room for a new message. We don't want to force all recipients to wait
+for the slowest one, so we spawn a new lightweight thread for each recipient.
+
+\begin{code}
+srvAwait :: Useless RcptList -> Server String
+srvAwait uRcpts = do
+  rcpts <- mkUseful uRcpts
+  sid <- getSessionID
+  liftIO $ do
+    recipients <- CC.withMVar rcpts return
+    case find ((== sid) . fst) recipients of
+      Just (_, mv) -> CC.takeMVar mv
+      _            -> fail "Unregistered session; aborting"
+\end{code}
+
+The final server operation, notifying users of pending messages, finds the
+appropriate \lstinline!MVar! to wait on by searching the recipient list for the
+session identifier of the calling user, and then blocks until a message arrives
+in said \lstinline!MVar!. This is a little different from the other two
+operations, which perform their work as quickly as possible and then return
+immediately.
 
 \section{Implementation}
 
