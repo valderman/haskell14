@@ -3,26 +3,45 @@ import Haste.App
 import Haste.App.Concurrent
 import qualified Control.Concurrent as CC
 
-main = runApp (defaultConfig "ws://localhost:24601" 24601) $ do
-  clients <- liftServerIO $ CC.newMVar []
+type Recipient = (SessionID, CC.MVar String)
+type RcptList = CC.MVar [Recipient]
 
-  hello <- export $ mkUseful clients >>= \clients -> do
-    sid <- getSessionID
-    liftIO $ CC.modifyMVar clients $ \cs -> do
-      mv <- CC.newEmptyMVar
-      return ((sid, mv):cs ,())
+srvHello :: Useless RcptList -> Server ()
+srvHello uRcpts = do
+  recipients <- mkUseful uRcpts
+  sid <- getSessionID
+  rcptMVar <- liftIO CC.newEmptyMVar
+  liftIO $ CC.modifyMVar recipients $ \cs -> do
+    return ((sid, rcptMVar):cs ,())
 
-  awaitMsg <- export $ mkUseful clients >>= \clients -> do
-    sid <- getSessionID
+srvSend :: Useless RcptList -> String -> Server ()
+srvSend uRcpts message = do
+    rcpts <- mkUseful uRcpts
     liftIO $ do
-      cs <- CC.withMVar clients return
-      case find ((== sid) . fst) cs of
-        Just (_, mv) -> CC.takeMVar mv
-        _            -> fail "Client did not say hello - abort session!"
+      recipients <- CC.withMVar rcpts return
+      mapM_ (CC.forkIO . deliver message) recipients
+  where
+    deliver :: String -> Recipient -> IO ()
+    deliver message (_, rcptMVar) =
+      CC.putMVar rcptMVar message
 
-  sendMsg <- export $ \msg -> mkUseful clients >>= \clients -> liftIO $ do
-    recipients <- CC.withMVar clients return
-    mapM_ (CC.forkIO . flip CC.putMVar msg . snd) recipients
+srvAwait :: Useless RcptList -> Server String
+srvAwait uRcpts = do
+  rcpts <- mkUseful uRcpts
+  sid <- getSessionID
+  liftIO $ do
+    recipients <- CC.withMVar rcpts return
+    case find ((== sid) . fst) recipients of
+      Just (_, mv) -> CC.takeMVar mv
+      _            -> fail "Unregistered session; aborting"
+
+appMain :: App Done
+appMain = do
+  recipients <- liftServerIO $ CC.newMVar []
+
+  hello <- export $ srvHello recipients
+  awaitMsg <- export $ srvAwait recipients
+  sendMsg <- export $ srvSend recipients
 
   runClient $ withElems ["log", "message"] $ \[log, msgbox] -> do
     onServer hello
@@ -33,5 +52,9 @@ main = runApp (defaultConfig "ws://localhost:24601" 24601) $ do
     fork . forever $ mbox <! onServer awaitMsg
     
     msgbox `onEvent` OnKeyPress $ \13 -> do
-      getProp msgbox "value" >>= onServer . (sendMsg <.>)
+      msg <- getProp msgbox "value"
+      onServer (sendMsg <.> msg)
       setProp msgbox "value" ""
+
+main :: IO ()
+main = runApp (mkConfig "ws://localhost:1111" 1111) appMain
