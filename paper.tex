@@ -133,7 +133,7 @@ we structure and reason about our applications - clearly, an abstraction is
 called for.
 
 To put make the problem a bit more concrete, let's take a look at an example.
-Let's say what we want to implement a simple ``chatbox'' component for a
+Let's say that we want to implement a simple ``chatbox'' component for a
 website, to allow visitors to discuss the site's content in real time. Using
 mainstream development practives and recent technologies such as WebSockets,
 we may come up with something like the program in figure
@@ -224,9 +224,9 @@ following properties:
         callbacks and continuations.
   \item Side-effecting code is explicitly designated to run on either the
         client or the server using the type system while pure code can be
-        shared by both. Additionally, both client and server code may lift
-        general IO computations, allowing for safe IO code reuse within the
-        confines of the client or server designated code sections.
+        shared by both. Additionally, general IO computations may be lifted
+        into both client and server code, allowing for safe IO code reuse
+        within the confines of the client or server designated code sections.
   \item Client-server network communication is handled through statically typed
         RPC function calls, extending the reach of Haskell's type checker over
         the network and giving the programmer advance warning when she uses
@@ -883,10 +883,12 @@ of GHC, as well as being in the same ballpark as GHCJS for size. Haste, in
 contrast, produces code which is generally one to two orders of magnitude
 smaller than that produced by GHCJS or UHC.\ \cite{haste}
 
-This leaves us choosing between Clean and Haste for our client compiler. Since
-most of our abstractions, both the cooperative multitasking and the type-safe
+This leaves us choosing between Clean and Haste for our client compiler. Most
+of our abstractions, both the cooperative multitasking and the type-safe
 client-server communication itself, are easily expressed as monads, well
-supported in Haskell thanks to do-notation, the choice fell to Haste.
+supported in Haskell thanks to do-notation. Add the fact that one of this
+work's authors is the original author of Haste, giving us a better position to
+troubleshoot any code based thereupon, and Haste becomes the better choice.
 
 \subsection{Design of the Haste compiler}
 
@@ -977,7 +979,7 @@ than as a simple number, but recall that the \lstinline!Int! type is defined by
 GHC as \lstinline!data Int = I# Int#!.
 
 Functions are represented as plain Javascript functions, one of the blessings
-of targeting a high level language, and application is can therefore be
+of targeting a high level language, and application can therefore be
 implemented as its Javascript counterpart in most cases. In the general case,
 however, functions may be curried. For such cases where the arity of an applied
 function can not be determined statically, application is implemented using the
