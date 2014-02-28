@@ -941,6 +941,45 @@ would be entirely straightforward. This implementation not only allows for
 greater flexibility, but also eliminates any potentially hairy interaction with
 compiler internals.
 
+\paragraph{Inspiration and alternatives to \lstinline!export!} One crucial
+aspect of implementing cross-network function calls is, of course, the issue of
+data representation: the client side of things must be able to obtain some
+representation of any function it may want to call. In our solution, this
+representation is obtained through the use of the \lstinline!export! function,
+which when executed on the server pairs a function with a unique identifier and
+on the client, and when executed on the client returns said identifier so that
+the client may now refer to the function. While this has the advantage of being
+simple to implement, one major drawback of this method is that all functions
+must be explicitly exported in the \lstinline!App! monad prior to being called
+over the network.
+
+This approach was inspired by Cloud Haskell \cite{cloudhaskell}, which
+introduces the notion of ``static values''; values which are known at compile
+time. Codifying this in the type system, to enable it to be used as a basis for
+remote procedure calls, unfortunately requires some major changes to the
+compiler. Cloud Haskell has a stopgap measure for unmodified compilers wherein
+a remote table, pairing values with unique identifiers, are kept. This explicit
+bookkeeping relies on the programmer to assign appropriate types to both values
+themselves and their identifiers, breaking type safety.
+
+The astute reader may notice that this is exactly what the \lstinline!export!
+does as well, the difference being that \export!export! links the identifier to
+the value it represents on the type level, making it impossible to call
+non-existent remote functions and break the program's type safety in other ways.
+
+Another approach to this problem is defunctionalization
+\cite{defunctionalization}, a program transformation wherein functions are
+translated into algebraic data types. This approach would allow the client and
+server to use the same actual code; rather than passing an identifier around,
+the client would instead pass the actual defunctionalized function. This would
+have the added benefit of allowing functions to be arbitrarily composed before
+being remotely invoked.
+
+This approach also requires significant changes to the compiler, making it
+unsuitable for our use case. Moreover, we are not entirely convinced about the
+wisdom of allowing server-side execution of what is essentially arbitrary code
+sent from the client which, for web applications, is completely untrustworthy.
+
 \subsection{Limitations}
 \label{sec:limitations}
 
@@ -1083,6 +1122,9 @@ J. Bracker and A. Gill: Sunroof: A monadic DSL for generating JavaScript, Practi
 \bibitem[Conductance application server (2014)]{conductance}
 The Conductance application server, http://conductance.io
 
+\bibitem[Danvy, Nielsen (2001)]{defunctionalization}
+O. Danvy, L. R. Nielsen: Defunctionalization at work, 2001
+
 \bibitem[Dijkstra et al (2013)]{uhc}
 A. Dijkstra, J. Stutterheim, A. Vermeulen, S. D. Swierstra: Building JavaScript applications with Haskell, Implementation and Application of Functional Languages, pp 37-52, 2013
 
@@ -1097,6 +1139,9 @@ A. Ekblad: Towards a declarative web, MSc thesis, University of Gothenburg, 2012
 
 \bibitem[Elliott (2009)]{ppfrp}
 C. M. Elliott: Push-pull functional reactive programming, in Proceedings of the 2nd ACM SIGPLAN symposium on Haskell, 2009
+
+\bibitem[Epstein et al (2011)]{cloudhaskell}
+J. Epstein, A. P. Black, S. Peyton Jones: Towards Haskell in the Cloud, 2011
 
 \bibitem[Guthrie (2014)]{jserlang}
 G. Guthrie: http://luvv.ie/2014/01/21/your-transpiler-to-javascript-toolbox/, 2014
@@ -1118,6 +1163,9 @@ S. Peyton Jones: Tackling the awkward squad: monadic input/output, concurrency, 
 
 \bibitem[Pignotti (2013)]{duetto}
 A. Pignotti: Duetto: a C++ compiler for the Web going beyond emscripten and node.js, http://leaningtech.com/duetto/blog/2013/10/31/Duetto-Released/, 2013
+
+\bibitem[Svenningsson, Svensson (2013)]{bjornbenny}
+J. Svenningsson, J. Svensson: Simple and Compositional Reification of Monadic Embedded Languages, 2013
 
 \bibitem[Taylor (2013)]{printf}
 C. Taylor: Polyvariadic Functions and Printf, http://chris-taylor.github.io/blog/2013/03/01/how-haskell-printf-works/, 2013
