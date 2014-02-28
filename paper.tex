@@ -678,7 +678,9 @@ megabytes for very simple programs - which rules it out for our use case, in
 spite of providing slightly better compatibility with low-level GHC features
 than Haste. Similarly, the code produced by the UHC Javascript backend tends to
 be relatively slow due to it lacking the more mature optimization capabilities
-of GHC, as well as being in the same ballpark as GHCJS for size.\ \cite{haste}
+of GHC, as well as being in the same ballpark as GHCJS for size. Haste, in
+contrast, produces code which is generally one to two orders of magnitude
+smaller than that produced by GHCJS or UHC.\ \cite{haste}
 
 This leaves us choosing between Clean and Haste for our client compiler. Since
 most of our abstractions, both the cooperative multitasking and the type-safe
