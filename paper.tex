@@ -38,9 +38,9 @@
 \setlength{\pdfpageheight}{\paperheight}
 \setlength{\pdfpagewidth}{\paperwidth}
 
-\conferenceinfo{ICFP '14}{Month d--d, 20yy, City, ST, Country} 
-\copyrightyear{20yy} 
-\copyrightdata{978-1-nnnn-nnnn-n/yy/mm} 
+\conferenceinfo{ICFP~'14}{September 1--3, 2014, Gothenburg, Sweden} 
+\copyrightyear{2014}
+\copyrightdata{978-1-nnnn-nnnn-n/14/09}
 \doi{nnnnnnn.nnnnnnn}
 
 % Uncomment one of the following two, if you are not going for the 
@@ -53,8 +53,8 @@
                                   % (paid open-access papers, 
                                   % short abstracts)
 
-\titlebanner{banner above paper title}        % These are ignored unless
-\preprintfooter{short description of paper}   % 'preprint' option specified.
+\titlebanner{-- ICFP '14 draft submission --}        % These are ignored unless
+\preprintfooter{-- -- -- -- draft -- -- -- --}   % 'preprint' option specified.
 
 \title{Type-safe client-server communication for functional web applications}
 
@@ -629,7 +629,7 @@ this becomes a disproportionate irritant. Fortunately, most web applications
 tend to have more complex client-server interactions, reducing this overhead
 significantly.
 
-\section{Implementation}
+\section{Implementation}\label{sec:impl}
 
 Our implementation is built in three layers: the compiler layer, the
 concurrency layer and the communication layer. The concurrency and
