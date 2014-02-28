@@ -622,6 +622,75 @@ significantly.
 
 \section{Implementation}
 
+Our implementation is built in three layers: the compiler layer, the
+concurrency layer and the communication layer. The concurrency and
+communication layers are simple Haskell libraries, portable to any other pair
+of standard Haskell compilers with minimal effort.
+
+\paragraph{Two compilers}
+The principal trick to our solution is compiling the same program twice; once
+with a compiler that generates the server binary, and once with one that
+generates Javascript for execution on the client. Conditional compilation is
+used for a select few functions, to enable slightly different behavior on the
+client and on the server as necessary. As we believe that a monadic
+programming style is a good fit for this application, we have chosen to use
+Haskell as the base of our solution, which by default leads us to choose GHC
+as our server-side compiler. For reasons outlined in section \ref{sec:haste},
+the Haste compiler was chosen to provide the client-side code.
+
+\paragraph{The \lstinline!App! monad}
+The \lstinline!App! monad is where remote functions are declared, server state
+is initialized and program flow is finally handed over to the \lstinline!Client!
+monad. Slightly simplified, its definition is as follows.
+
+\begin{code}
+type Method = [JSON] -> IO JSON
+type AppState = (CallID, [(CallID, Method)])
+newtype App a = App (StateT AppState IO a)
+\end{code}
+
+As we can see, \lstinline!App! is a simple state monad, with underlying IO
+capabilities to allow server-side computations to be forked from within it.
+Aside from the \lstinline!runClient! function, which is only used to launch the
+client program, This monad has two primary operations.
+
+\begin{code}
+liftServerIO :: IO a -> App (Useless a)
+export :: Exportable a => a -> App (Export a)
+\end{code}
+
+Aside from the \lstinline!App! monad itself, these functions operate on two
+types we have not seen before.
+
+\begin{code}
+data Useless a = Useful a | Useless
+data Export a = Export CallID [JSON]
+\end{code}
+
+The definition of \lstinline!liftServerIO! is very simple. Through the use of
+conditional compilation, on the client it simply ignores its argument and
+returns \lstinline!Useless!; recall that server-lifted IO computations are not
+observable on the client. On the server side, \lstinline!liftServerIO! executes
+its argument and wraps the computation's return value using the
+\lstinline!Useful! constructor. The counterpart function, \lstinline!mkUseful!
+simply unwraps the \lstinline!Useful! constructor and returns the contained
+value in the \lstinline!Server! monad.
+
+\paragraph{The \lstinline!Client! monad and the \lstinline!onServer! function}
+As synchronous network communication is one of our stated goals, it is clear
+that we will need some kind of blocking primitive. Since Javascript does not
+support any kind of blocking, we will have to implement this ourselves.
+
+A solution is given in the \emph{poor man's concurrency
+monad}\ \cite{concurrencymonad}. Making use of a continuation monad with
+primitive operations for forking a computation and atomically lifting an IO
+computation into the monad, it is possible to implement cooperative
+multitasking on top of the non-concurrent Javascript runtime. This monad
+allows us to implement \lstinline!MVar!s as our blocking primitive, with the
+same semantics as their regular Haskell counterpart.\ \cite{ffi}
+This concurrency-enhanced monad is used as the basis of the \lstinline!Client!
+monad.
+
 \section{The Haste compiler}\label{sec:haste}
 
 In order to allow the same language to be used on both client and server, we
@@ -769,7 +838,7 @@ of targeting a high level language, and application is can therefore be
 implemented as its Javascript counterpart in most cases. In the general case,
 however, functions may be curried. For such cases where the arity of an applied
 function can not be determined statically, application is implemented using the
-eval/apply method described in \cite{fastcurry} instead.
+eval/apply method described in\ \cite{fastcurry} instead.
 
 \subsection{Interfacing with Javascript}
 
@@ -944,7 +1013,7 @@ simple to implement, one major drawback of this method is that all functions
 must be explicitly exported in the \lstinline!App! monad prior to being called
 over the network.
 
-This approach was inspired by Cloud Haskell \cite{cloudhaskell}, which
+This approach was inspired by Cloud Haskell\ \cite{cloudhaskell}, which
 introduces the notion of ``static values''; values which are known at compile
 time. Codifying this in the type system, to enable it to be used as a basis for
 remote procedure calls, unfortunately requires some major changes to the
@@ -958,18 +1027,21 @@ does as well, the difference being that \lstinline!export! links the identifier
 to the value it represents on the type level, making it impossible to call
 non-existent remote functions and break the program's type safety in other ways.
 
-Another approach to this problem is defunctionalization
-\cite{defunctionalization}, a program transformation wherein functions are
-translated into algebraic data types. This approach would allow the client and
-server to use the same actual code; rather than passing an identifier around,
-the client would instead pass the actual defunctionalized function. This would
-have the added benefit of allowing functions to be arbitrarily composed before
-being remotely invoked.
+Another approach to this problem is
+defunctionalization\ \cite{defunctionalization}, a program transformation
+wherein functions are translated into algebraic data types. This approach would
+allow the client and server to use the same actual code; rather than passing
+an identifier around, the client would instead pass the actual defunctionalized
+function. This would have the added benefit of allowing functions to be
+arbitrarily composed before being remotely invoked.
 
 This approach also requires significant changes to the compiler, making it
 unsuitable for our use case. Moreover, we are not entirely convinced about the
 wisdom of allowing server-side execution of what is essentially arbitrary code
 sent from the client which, for web applications, is completely untrustworthy.
+While analyzing code for improper behavior is certainly possible, implementing
+and enforcing a sufficiently strict-yet-flexible security policy for remote
+execution would be an unwelcome burden on the programmer.
 
 \subsection{Limitations}
 \label{sec:limitations}
@@ -1094,9 +1166,9 @@ continuations which is well suited for use with a GUI programming style based on
 communicating processes with local state, and requires essentially no
 modification of existing tools or compilers.
 
-\acks
-
-Acknowledgments, if needed.
+%\acks
+%
+%Acknowledgments, if needed.
 
 % We recommend abbrvnat bibliography style.
 
