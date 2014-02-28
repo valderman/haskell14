@@ -622,23 +622,12 @@ significantly.
 
 \section{Implementation}
 
-\begin{itemize}
-  \item Poor man's concurrency monad
-  \item Conditional compilation
-  \item Printf trick to turn export into [JSON] -> f
-  \item JSON over WebSockets used for transport
-  \item Server event loop awaits commands, dispatches functions, sends data back
-  \item Client sends command with nonce and blocks on MVar, event loop fills
-        MVar when return value with proper nonce arrives
-  \item Throw away unused stuff on client
-\end{itemize}
-
-\section{The Haste compiler}
+\section{The Haste compiler}\label{sec:haste}
 
 In order to allow the same language to be used on both client and server, we
 obviously need some way to compile that language into Javascript. To this end,
-we make use of the Haste compiler\ \cite{haste}, developed as a MSc thesis and
-extended as part of this work. Haste builds on the GHC compiler to provide
+we make use of the Haste compiler\ \cite{haste}, started as an MSc thesis and
+continued as part of this work. Haste builds on the GHC compiler to provide
 the full Haskell language, including most GHC-specific extensions, in the
 browser.
 
@@ -965,8 +954,8 @@ bookkeeping relies on the programmer to assign appropriate types to both values
 themselves and their identifiers, breaking type safety.
 
 The astute reader may notice that this is exactly what the \lstinline!export!
-does as well, the difference being that \export!export! links the identifier to
-the value it represents on the type level, making it impossible to call
+does as well, the difference being that \lstinline!export! links the identifier
+to the value it represents on the type level, making it impossible to call
 non-existent remote functions and break the program's type safety in other ways.
 
 Another approach to this problem is defunctionalization
@@ -1120,6 +1109,9 @@ Acknowledgments, if needed.
 
 \bibitem[Bracker, Gill (2014)]{sunroof}
 J. Bracker and A. Gill: Sunroof: A monadic DSL for generating JavaScript, Practical Aspects of Declarative Languages, 65-80, 2014
+
+\bibitem[Claessen (1999)]{concurrencymonad}
+K. Claessen: Functional Pearls: A poor man's concurrency monad, 1999
 
 \bibitem[Conductance application server (2014)]{conductance}
 The Conductance application server, http://conductance.io
