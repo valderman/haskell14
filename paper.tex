@@ -56,8 +56,7 @@
 \titlebanner{banner above paper title}        % These are ignored unless
 \preprintfooter{short description of paper}   % 'preprint' option specified.
 
-\title{Type-safe client-server communication for web applications}
-\subtitle{Subtitle Text, if any}
+\title{Type-safe client-server communication for functional web applications}
 
 \authorinfo{Koen Claessen and Anton Ekblad}
            {Chalmers University of Technology}
@@ -275,7 +274,7 @@ appMain = do
 
 The \lstinline!export! function takes an arbitrary function, provided that all
 its arguments as well as its return value are serializable through the aptly
-named \lstinline!Serializable! type class, and returns a typed ``handle'' of
+named \lstinline!Serialize! type class, and returns a typed ``handle'' of
 sorts. In this example, the type of \lstinline!greetings! is
 \lstinline!Export (String -> Server ())!, indicating that the handle identifies
 an exported function with a single \lstinline!String! argument and no return
@@ -627,6 +626,12 @@ concurrency layer and the communication layer. The concurrency and
 communication layers are simple Haskell libraries, portable to any other pair
 of standard Haskell compilers with minimal effort.
 
+To pass data back and forth over the network, messages are serialized using
+JSON, a fairly lightweight format used by many web applications, and sent using
+the HTML5 WebSockets API. This choice is completely arbitrary, guided purely
+by implementation convenience. It is certainly not the most performant choice,
+but can be easily replaced with something more suitable as the need arises.
+
 \paragraph{Two compilers}
 The principal trick to our solution is compiling the same program twice; once
 with a compiler that generates the server binary, and once with one that
@@ -644,27 +649,28 @@ is initialized and program flow is finally handed over to the \lstinline!Client!
 monad. Slightly simplified, its definition is as follows.
 
 \begin{code}
+type CallID = Int
 type Method = [JSON] -> IO JSON
 type AppState = (CallID, [(CallID, Method)])
-newtype App a = App (StateT AppState IO a)
+type App = StateT AppState IO
 \end{code}
 
 As we can see, \lstinline!App! is a simple state monad, with underlying IO
 capabilities to allow server-side computations to be forked from within it.
+Its \lstinline!CallID! state element contains the identifier to be given to the
+next exported function, and its other state element contains a mapping from
+identifiers to exported functions. Of course, in reality, \lstinline!App! is a
+\lstinline!newtype!, to prevent arbitrary lifting of IO computations.
+
 Aside from the \lstinline!runClient! function, which is only used to launch the
 client program, This monad has two primary operations.
 
 \begin{code}
-liftServerIO :: IO a -> App (Useless a)
-export :: Exportable a => a -> App (Export a)
-\end{code}
-
-Aside from the \lstinline!App! monad itself, these functions operate on two
-types we have not seen before.
-
-\begin{code}
 data Useless a = Useful a | Useless
 data Export a = Export CallID [JSON]
+
+liftServerIO :: IO a -> App (Useless a)
+export :: Exportable a => a -> App (Export a)
 \end{code}
 
 The definition of \lstinline!liftServerIO! is very simple. Through the use of
@@ -675,6 +681,65 @@ its argument and wraps the computation's return value using the
 \lstinline!Useful! constructor. The counterpart function, \lstinline!mkUseful!
 simply unwraps the \lstinline!Useful! constructor and returns the contained
 value in the \lstinline!Server! monad.
+
+\lstinline!export! is a more interesting function. Looking at its type, we see
+that it accepts any \lstinline!Exportable! value for its argument.
+\lstinline!Exportable! is defined as follows.
+
+\begin{code}
+class Exportable a where
+  mkExported :: a -> ([JSON] -> IO JSON)
+
+instance Serialize a =>
+         Exportable (Server a)
+instance (Serialize a, Exportable b) =>
+         Exportable (a -> b)
+\end{code}
+
+In essence, any function, over any number of arguments, which returns a
+serializable value in the \lstinline!Server! monad can be exported. The
+\lstinline!mkExported! function makes use a well-known type class trick for
+creating statically typed variadic functions, and works very much like the
+\lstinline!printf! function of Haskell's standard library.\ \cite{printf}
+From an \emph{n}-ary function, it creates a unary function which expects
+a list of \emph{n} JSON-encoded elements as its argument. When applied, its
+argument list is deserialized and passed to the exported function, and its
+return value is serialized. This allows us to easily bundle up all of an
+exported function's arguments and pass them across the network.
+
+The client implementation of \lstinline!export! is straightforward.
+
+\begin{code}
+export _ = do
+  (next_id, exports) <- get
+  put (next_id+1, exports)
+  return (Export next_id [])
+\end{code}
+
+As the exported function lives on the server, the client only needs an
+identifier to be able to call on it. The exported function is thus ignored,
+so that it can be optimized out of existence in the client version of the code.
+The server version is only marginally more complex in that it updates the
+identifier-function mapping table as well.
+
+\begin{code}
+export f = do
+  (next_id, exports) <- get
+  put (next_id+1, (next_id, mkExported f) : exports)
+  return (Export next_id [])
+\end{code}
+
+The second argument of the \lstinline!Export! constructor is, as the observant
+reader might have guessed, the list of arguments to be sent to the export.
+Essentially, an explicit closure is built up using the \lstinline!<.>! operator
+and sent off over the network for execution.
+
+\begin{code}
+(<.>) :: Serialize a
+      => Export (a -> b) -> a -> Export b
+(Export identifier args) <.> arg =
+  Export identifier (serialize arg : args)
+\end{code}
 
 \paragraph{The \lstinline!Client! monad and the \lstinline!onServer! function}
 As synchronous network communication is one of our stated goals, it is clear
@@ -888,9 +953,8 @@ code. This function exploits Javascript's ability to parse and execute
 arbitrary strings at run-time using the \lstinline!eval! function, coupled with
 the fact that functions in Haste and in Javascript share the same
 representation, to dynamically create a function object at runtime.
-The \lstinline!ffi! function is typed using a well-known type class trick for
-creating statically typed variadic functions\ \cite{printf}, and works very
-much like the \lstinline!printf! function of Haskell's standard library.
+The \lstinline!ffi! function is typed using the same method as the
+\lstinline!serializify! function described in section \ref{sec:impl}.
 When applied to one or more arguments instantiating the \lstinline!Marshal!
 type class, the \lstinline!pack! function is applied to each argument,
 marshalling them into their respective Javascript representations, before they
