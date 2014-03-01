@@ -223,9 +223,7 @@ described in the previous section. We propose an alternative programming model
 based on Haskell, in which web applications are written as monolithic entities
 rather than as two independent parts that just so happen to talk to each other.
 
-Our proposed model, dubbed ``Haste.App'' in an ingenious attempt at
-capitalizing on the recent popularity of the ``app'' buzzword, has the
-following properties:
+Our proposed model, dubbed ``Haste.App'', has the following properties:
 
 \begin{itemize}
   \item The programming model is synchronous, giving the programmer a simple,
@@ -281,8 +279,8 @@ Next, we need to make the \lstinline!helloServer! function available as an RPC
 function and call it from the client.
 
 \begin{code}
-appMain :: App Done
-appMain = do
+clientMain :: App Done
+clientMain = do
   greetings <- export helloServer
 
   runClient $ do
@@ -341,8 +339,8 @@ loopback interface.
 
 \begin{code}
 main :: IO ()
-main =
-  runApp (mkConfig "ws://localhost:1111" 1111) appMain
+main = runApp (mkConfig "ws://localhost:1111" 1111)
+              clientMain
 \end{code}
 
 This part is entirely straightforward; the URL of the server is provided for
@@ -354,7 +352,7 @@ its entirety.
 Like \lstinline!runClient!, \lstinline!runApp! does not return, and is intended
 to be the only computation executed by \lstinline!main!. In fact, performing
 non-deterministic IO and allowing \lstinline!runApp! or its arguments to
-capture the result may lead to unpredictable behavior. The \lstinline!appMain!
+capture the result may lead to unpredictable behavior. The \lstinline!clientMain!
 function should for all intents and purposes be regarded as the program's entry
 point. A non-intrusive method of enforcing this using the type system is
 described in section \ref{sec:limitations}, but is not used in the examples
@@ -368,8 +366,8 @@ helloServer :: String -> Server ()
 helloServer name =
   liftIO $ putStrLn (name ++ " says hello!")
 
-appMain :: App Done
-appMain = do
+clientMain :: App Done
+clientMain = do
   greetings <- export helloServer
 
   runClient $ do
@@ -377,8 +375,8 @@ appMain = do
     onServer (greetings <.> name)
 
 main :: IO ()
-main =
-  runApp (mkConfig "ws://localhost:1111" 1111) appMain
+main = runApp (mkConfig "ws://localhost:1111" 1111)
+              clientMain
 \end{code}
 \caption{A seamless programming model: Hello Server}
 \label{lst:hello-server}
@@ -418,7 +416,7 @@ passed to \lstinline!runApp! should for all intents and purposes be regarded as
 the program's entry point.
 
 To allow the use of server state while treating the final argument to
-\lstinline!runApp! (from here on always referred to as \lstinline!appMain!)
+\lstinline!runApp! (from here on always referred to as \lstinline!clientMain!)
 as the program's entry point, we may want to allow arbitrary IO computations to
 be lifted into the \lstinline!App! monad:
 
@@ -570,8 +568,8 @@ to the client. We start by creating an \lstinline!MVar! to hold the server
 state and exporting our three server operations.
 
 \begin{code}
-appMain :: App Done
-appMain = do
+clientMain :: App Done
+clientMain = do
   recipients <- liftServerIO $ CC.newMVar []
 
   hello <- export $ srvHello recipients
@@ -633,7 +631,8 @@ is to actually launch our application.
 \begin{code}
 main :: IO ()
 main =
-  runApp (mkConfig "ws://localhost:1111" 1111) appMain
+  runApp (mkConfig "ws://localhost:1111" 1111)
+         clientMain
 \end{code}
 
 The discerning reader may be slightly annoyed at the need to extract the
@@ -1281,8 +1280,8 @@ client and server to fail.
 
 This is easily remedied however, by a slight compiler modification. Instead of
 using \lstinline!main :: IO ()! as the program entry point, we introduce a
-function \lstinline!appMain :: App Done! for this purpose, and let the runtime
-system start the application by invoking \lstinline!runApp config appMain!,
+function \lstinline!clientMain :: App Done! for this purpose, and let the runtime
+system start the application by invoking \lstinline!runApp config clientMain!,
 where \lstinline!config! contains the URL and port configuration for the
 server, given by the programmer using a compiler flag.
 
