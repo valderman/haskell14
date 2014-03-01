@@ -804,7 +804,8 @@ onServer (Export identifier args) = do
   nonce <- get
   put (nonce + 1)
   mv <- createResultMVar nonce
-  webSocketSend $ serialize (nonce, identifier, reverse args)  
+  webSocketSend $
+    serialize (nonce, identifier, reverse args)  
   takeMVar mv
 \end{code}
 
