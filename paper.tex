@@ -306,7 +306,7 @@ This part of the program is executed on both the server and the client, albeit
 with slightly different side effects, as described in section \ref{sec:impl}.
 
 After the \lstinline!export! call, we enter the domain of client-exclusive code
-with the application of \lstinline!runClient!. This function, execute
+with the application of \lstinline!runClient!. This function executes
 computations in the \lstinline!Client! monad which is essentially an
 IO monad with cooperative multitasking added on top, to mitigate the fact that
 Javascript has no native concurrency support. \lstinline!runClient! does not
@@ -686,7 +686,7 @@ Its definition is as follows.
 type CallID = Int
 type Method = [JSON] -> IO JSON
 type AppState = (CallID, [(CallID, Method)])
-newtype App a = (StateT AppState IO a)
+newtype App a = App (StateT AppState IO a)
   deriving (Functor, Applicative, Monad)
 \end{code}
 
@@ -899,8 +899,8 @@ target the web space using a subset of Haskell; and there exist solutions for
 compiling Erlang\ \cite{jserlang} and Clean\ \cite{jsclean} to Javascript as
 well.
 
-In the face of this multitude of options, why did we settle on Haste? We make
-the following demands of a candidate source language:
+Essentially, our approach is portable to any language or compiler with the
+following properties:
 
 \begin{itemize}
   \item The language must provide a static type system, since one of our
@@ -909,33 +909,17 @@ the following demands of a candidate source language:
   \item The language must be compilable to both Javascript and a format
         suitable for server-side execution as we want our web applications
         to be written as a single, monolithic program.
-  \item We also want our compiler to be practical, in the sense that its output
-        should not be disproportionately large or slow. This is more important
-        for the client part, where we have to contend with slow connections and
-        the overhead of running within an interpreter, than for the server part.
+  \item We want the language to provide decent support for a monadic
+        programming style, as we our abstractions for cooperative multitasking
+        and synchronous client-server communication are neatly expressible in
+        this style.
 \end{itemize}
 
-Our first criterion rules out the dynamically typed Erlang. The second rules
-out Fay which unfortunately lacks critical Haskell features, most notably type
-classes, and thus has no one to one server-side counterpart compiler.
-
-This still leaves us with four options: Clean, GHCJS, Haste and UHC. However,
-the output from GHCJS is prohibitively large - often in the range of several
-megabytes for very simple programs - which rules it out for our use case, in
-spite of providing very good compatibility with even low-level GHC features.
-Similarly, the code produced by the UHC Javascript backend tends to
-be relatively slow due to it lacking the more mature optimization capabilities
-of GHC, as well as being in the same ballpark as GHCJS for size. Haste, in
-contrast, produces code which is generally one to two orders of magnitude
-smaller than that produced by GHCJS or UHC.\ \cite{haste}
-
-This leaves us choosing between Clean and Haste for our client compiler. Most
-of our abstractions, both the cooperative multitasking and the type-safe
-client-server communication itself, are easily expressed as monads, well
-supported in Haskell thanks to do-notation and a culture of monadic design
-patterns. Add the fact that one of this work's authors is the original author
-of Haste, giving us a better position to troubleshoot any code based thereupon,
-and Haste becomes the better choice.
+While several of the aforementioned compilers fullfil these criteria, the
+choice between them becomes almost arbitrary. We chose to base our solution on
+Haste as we, by virtue of its authorship, have an intimate knowledge of its
+internal workings, strengths and weaknesses. Without doubt, others may see many
+reasons to make a different choice.
 
 \subsection{Design goals}
 
@@ -948,12 +932,17 @@ One such tradeoff is the decision to make use of the facilities provided by the
 web browser - most prominently the Javascript engine's native garbage
 collector - as far as possible rather than implementing parts of the GHC
 runtime in Javascript. In the same vein, a conscious effort is made to generate
-as ``regular-looking'' code as possible. In some rare cases, this means having
-to sacrifice compatibility with low-level GHC features. Most notably, Haste
-does not support weak references or pre-emptive multitasking, as these would
-require modifications to the runtime system and generated code which confound
-the structure of the resulting Javascript and have a detrimental impact on code
-size and execution speed.
+as ``regular-looking'' code as possible. This results in large gains in code
+compactness and execution speed - in our experiences, compiler Haste programs
+are often an order of magnitude smaller and several times faster than an
+equivalent program compiled with some other Haskell to Javascript compiler.
+
+In some rare cases, however, this means having to sacrifice compatibility with
+low-level GHC features. Most notably, Haste does not support weak references
+or pre-emptive multitasking, as these would require modifications to the
+runtime system and generated code which confound the structure of the
+resulting Javascript and have a detrimental impact on code size and execution
+speed.
 
 \subsection{Implementation overview}
 
