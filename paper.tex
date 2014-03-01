@@ -99,7 +99,7 @@ writing the one in Javascript, which is notorious even among its proponents for
 being wonky and error-prone, and the other in any compiled or
 server-interpreted language. Then, two are glued together using whichever
 home-grown network protocol seems to fit the application. However, most web
-applications are conceptually monolithic entities, making this forced split an
+applications are conceptually single entities, making this forced split an
 undesirable hindrance which introduces new possibilities for defects, adds
 development overhead and prevents code reuse.
 
@@ -222,7 +222,7 @@ client/server architectures and network protocol design at all?
 
 There are many conveivable improvements to the mainstream web development model
 described in the previous section. We propose an alternative programming model
-based on Haskell, in which web applications are written as monolithic entities
+based on Haskell, in which web applications are written as a single program
 rather than as two independent parts that just so happen to talk to each other.
 
 Our proposed model, dubbed ``Haste.App'', has the following properties:
@@ -916,7 +916,7 @@ following properties:
         the client-server communication channel.
   \item The language must be compilable to both Javascript and a format
         suitable for server-side execution as we want our web applications
-        to be written as a single, monolithic program.
+        to be written and compiled as a single program.
   \item We want the language to provide decent support for a monadic
         programming style, as we our abstractions for cooperative multitasking
         and synchronous client-server communication are neatly expressible in
