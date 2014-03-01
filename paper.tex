@@ -1343,8 +1343,10 @@ with functional semantics, clear demarcations as to when data is transmitted
 and where a particular piece of code is executed, and the ability to
 effortlessly share code between the client and the server.
 
-Our model is based on a simple blocking concurrency model rather than explicit
-continuations which is well suited for use with a GUI programming style based on
+Our model is client-centric, in that the client drives the application while
+the server takes on the role of passively serving client requests, and is based
+on a simple blocking concurrency model rather than explicit continuations.
+It is well suited for use with a GUI programming style based on
 self-contained processes with local state, and requires essentially no
 modification of existing tools or compilers.
 
