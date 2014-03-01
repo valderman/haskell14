@@ -1114,7 +1114,9 @@ our own, but also adds the possibility for the server to independently transmit
 data back to the client through the use of shared variables or call back into
 the client by way of function objects received via RPC call, as well as the
 possibility for both client and server to seamlessly modify variables located
-on the opposite end of the network.
+on the opposite end of the network. Conductance is quite new and has no
+relevant publications. It is, however, used for several large scale web
+applications.
 
 While Conductance gets rid of the callback-based programming model endemic to
 regular Javascript, it still suffers from many of its usual drawbacks. In
@@ -1138,9 +1140,10 @@ utilizes the new attributes mechanism introduced in C++11\ \cite{sepples11} to
 designate functions and data to live on either client or server side. Any calls
 to a function on the other side of the network and attempts to access remote
 data are implicit, requiring no extra annotations or scaffolding at the call
-site.
+site. Duetto is still a highly experimental project, its first release being
+only a few months old, and has not been published in any academic venue.
 
-Much like Conductance, Duetto suffers somewhat from its heritage: while the
+Like Conductance, Duetto suffers somewhat from its heritage: while the
 client-side code is not memory-unsafe, as it is not possible to generate
 memory-unsafe Javascript code, its server-side counterpart unfortunately is.
 Our reservations expressed about how network communication in Duetto can be
