@@ -1259,27 +1259,36 @@ computations called by \lstinline!main!. Consider the following example:
 
 \begin{code}
 main = do
-  captured <- randomRIO (False, True)
+  exportTwo <- randomRIO (False, True)
 
   runApp config $ do
-    diverged <- export $ \transmitted -> do
-      if captured == transmitted
-        then return ``All OK''
-        else return ``Diverged''
+    when exportTwo $ do
+      _ <- export (return () :: Server ())
+      return ()
+    fun <- export $ return "I'm a little teapot"
 
     runClient $ do
-      divergence <- onServer (diverged <.> captured)
-      alert divergence
+      onServer fun >>= alert
 \end{code}
 
-The dialog box displayed by this program will read ``All OK'' roughly half
-of the times it is run, while in half of the runs it will read ``Diverged''.
-The reason for this is that the \lstinline!randomRIO! computation will be
-executed twice - once on the client, and once on the server. Whenever the
-computation returns differening results, the client and the server will have
-conflicting opinions on the actual value of \lstinline!captured!, causing any
-code which - quite reasonably - assumes that variables are consistent between
-client and server to fail.
+Whenever \lstinline!exportTwo! gets assigned a \lstinline!True! value, this
+application will call \lstinline!export! twice, assigning the identifier
+\lstinline!0! to the first exported computation, which is discarded, and
+\lstinline!1! to the second, \lstinline!fun!, which is kept and invoked.
+If, on the other hand, \lstinline!exportTwo! is \lstinline!False!,
+only the second computation will be exported, and will thus be assigned the
+identifier \lstinline!1!.
+
+This is perfectly fine as long as the client and server both assign the
+same identifier to \lstinline!fun!. However, since \lstinline!randomRIO! is
+not deterministic and since all computations called by \lstinline!main! will be
+executed on both the client and the server, there is a possibility that
+\lstinline!fun! will be assigned the identifier \lstinline!0! on the client and
+\lstinline!1! on the server. In this scenario, when the client attempts to call
+the \lstinline!return "I'm a little teapot"! computation over the network,
+the server instead executes the \lstinline!return ()! computation, which
+returns \lstinline!()! rather than \lstinline!String!, breaking the type safety
+of our program!
 
 This is easily remedied however, by a slight compiler modification. Instead of
 using \lstinline!main :: IO ()! as the program entry point, we introduce a
