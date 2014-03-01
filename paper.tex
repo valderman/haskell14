@@ -477,7 +477,7 @@ main =
 \label{lst:good-state}
 \end{listingfloat}
 
-\subsection{The chatbox, revisited}
+\subsection{The chatbox, revisited}\label{sec:chatboxrevisited}
 
 Now that we have seen how to implement both network communication, we are ready
 to revisit the chatbox program, this time using our improved programming model.
@@ -1345,6 +1345,14 @@ for such an information flow control scheme, as well as ensure that this policy
 is not violated at compile time. This could shorten development cycles as well
 as give a reasonable level of confidence that any run time policy violation is
 indeed an attempted attack.
+
+\paragraph{Real world applications} As Haste.App is quite new and experimental,
+it has yet to be used in the creation of large scale applications. While we
+have used it to implement some small applications, such as a spaced repetition
+vocabulary learning program and a more featureful variant on the chatbox
+example given in section \ref{sec:chatboxrevisited}, further investigation of
+its suitability for larger real world applications through the development of
+several larger scale examples is an important area of future work.
 
 \section{Conclusion}
 
