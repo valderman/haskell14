@@ -1173,6 +1173,17 @@ may be of use to both client and server is effortlessly shared, leading to less
 duplication of code and increased possibilities for reusing third party
 libraries.
 
+Interactive multiplayer games is one type of application where this code
+sharing may have a large impact. In order to ensure that players are not
+cheating, a game server must keep track of the entire game state and send
+updates to clients at regular intervals. However, due to network latency,
+waiting for server input before rendering each and every frame is completely
+impractical. Instead, the usual approach is to have each client continuously
+compute the state of the game to the best of its knowledge, rectifying any
+divergence from the game's ``official'' state whenever an update arrives from
+the server. In this scenario, it is easy to see how reusing much of the same
+game logic between the client and the server would be very important.
+
 Any and all communication between client and server is both strongly typed
 and made explicit by the use of the \lstinline!onServer! function, with the
 programmer having complete control over the serialization and de-serialization
