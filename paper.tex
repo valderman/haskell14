@@ -150,6 +150,7 @@ content in real time. Using mainstream development practices and recent
 technologies such as WebSockets\ \cite{websockets}, we may come up with
 something like the program in figure \ref{lst:javascript-client}.
 
+\label{sec:jsexample}
 \begin{listingfloat}
 \begin{code}
 function handshake(sock) {sock.send('helo');}
@@ -480,10 +481,10 @@ main =
 \subsection{The chatbox, revisited}\label{sec:chatboxrevisited}
 
 Now that we have seen how to implement both network communication, we are ready
-to revisit the chatbox program, this time using our improved programming model.
-Since we are now writing the entire application, both client and server, as
-opposed to the client part from our motivating example, our program has three
-new responsibilities.
+to revisit the chatbox program from section \ref{sec:jsexample}, this time
+using our improved programming model. Since we are now writing the entire
+application, both client and server, as opposed to the client part from our
+motivating example, our program has three new responsibilities.
 
 \begin{itemize}
   \item We need to add connecting users to a list of message recipients;
@@ -569,8 +570,11 @@ the session will be automatically cleaned up on the server side and an exception
 is thrown to the client.
 
 Having implemented our three server operations, all that's left is to tie them
-to the client. We start by creating an \lstinline!MVar! to hold the server
-state and exporting our three server operations.
+to the client. In this tying, we see our main advantage over the Javascript
+version in section \ref{sec:jsexample} in action: the \lstinline!export!
+function builds a strongly typed bridge between the client and the server,
+ensuring that any future enhancements to our chatbox program are made safely,
+in one place, instead of being spread about throughout two disjoint code bases.
 
 \begin{code}
 clientMain :: App Done
@@ -1380,10 +1384,6 @@ on a simple blocking concurrency model rather than explicit continuations.
 It is well suited for use with a GUI programming style based on
 self-contained processes with local state, and requires essentially no
 modification of existing tools or compilers.
-
-%\acks
-%
-%Acknowledgments, if needed.
 
 % We recommend abbrvnat bibliography style.
 
