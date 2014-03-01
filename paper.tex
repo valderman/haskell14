@@ -785,6 +785,12 @@ so that it can be optimized out of existence in the client version of the code.
 The server version is only marginally more complex in that it updates the
 identifier-function mapping table as well.
 
+This concept of client-side identifiers being sent to the server and used as
+indices into a table mapping identifiers to remotely accessible functions is an
+extension of the concept of ``static values'' introduced by Epstein et al with
+Cloud Haskell\ \cite{cloudhaskell}, which is discussed further in section
+\ref{sec:cloudhaskell}.
+
 \begin{code}
 export f = App $ do
   (next_id, exports) <- get
@@ -792,10 +798,9 @@ export f = App $ do
   return (Export next_id [])
 \end{code}
 
-The second argument of the \lstinline!Export! constructor is, as the observant
-reader might have guessed, the list of arguments to be sent to the export,
-to be updated as the exported function is applied using the \lstinline!<.>!
-operator.
+The second argument of the \lstinline!Export! constructor is the list of
+arguments to be sent to the export, to be updated as the exported function is
+applied using the \lstinline!<.>! operator.
 
 \begin{code}
 (<.>) :: Serialize a
@@ -1181,9 +1186,10 @@ modifying our implementation to use GHCJS or even the Javascript backend of UHC
 would be trivial. This implementation not only allows for greater flexibility,
 but also eliminates the need to tangle with complex compiler internals.
 
-\paragraph{Inspiration and alternatives to \lstinline!export!} One crucial
-aspect of implementing cross-network function calls is the issue of data
-representation: the client side of things must be able to obtain some
+\paragraph{Inspiration and alternatives to \lstinline!export!}
+\label{sec:cloudhaskell}
+One crucial aspect of implementing cross-network function calls is the issue of
+data representation: the client side of things must be able to obtain some
 representation of any function it may want to call on the server.
 
 In our solution, this representation is obtained through the use of the \lstinline!export! function, which when executed on the server pairs a function with a
