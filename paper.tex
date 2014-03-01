@@ -65,16 +65,18 @@
 \maketitle
 
 \begin{abstract}
-Developing web applications, especially applications which need to communicate
-with a server, is often a painful experience. What is conceptually a single
-monolithic application is forcefully split into a client and a server
-explicitly communicating over the network, with all the code duplication,
-complexity and lost type safety this entails.
-
-We propose instead a development model in which a web application is written
-and compiled as a whole, allowing for synchronous, type safe client-server
-communication without the need for explicit networking code, as well as the
-sharing of code between client and server.
+We propose a new programming model for web applications which is (1)
+seamless; one program and one language is used to produce code for
+both client and server, (2) client-centric; the programmer takes the
+viewpoint of the client that runs code on the server rather than the
+other way around, and (3) functional and type-safe; everything is
+implemented as a Haskell library that implicitly takes care of all
+networking code. Our aim is to improve the painful and error-prone
+experience of today's standard development methods, in which clients
+and servers are coded in different languages and communicate with each
+other using ad-hoc protocols. We present the design of our library
+called Haste.App, an example web application that uses it, and discuss
+the implementation and the compiler technology on which it depends.
 \end{abstract}
 
 \category{D.1.3}{Programming Techniques}{Distributed Programming}
