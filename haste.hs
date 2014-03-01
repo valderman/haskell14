@@ -1,4 +1,3 @@
-import Data.List
 import Haste.App
 import Haste.App.Concurrent
 import qualified Control.Concurrent as CC
@@ -29,9 +28,9 @@ srvAwait uRcpts = do
   sid <- getSessionID
   liftIO $ do
     recipients <- CC.withMVar rcpts return
-    case find ((== sid) . fst) recipients of
-      Just (_, mv) -> CC.takeMVar mv
-      _            -> fail "Unregistered session; aborting"
+    case lookup sid recipients of
+      Just mv -> CC.takeMVar mv
+      _       -> fail "Unregistered session; aborting"
 
 appMain :: App Done
 appMain = do
