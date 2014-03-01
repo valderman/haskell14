@@ -295,8 +295,8 @@ are written from the client's perspective, making this the starting point of
 the client-side code.
 
 The \lstinline!export! function takes an arbitrary function, provided that all
-its arguments as well as its return value are serializable through the aptly
-named \lstinline!Serialize! type class, and produces a typed identifier which
+its arguments as well as its return value are serializable through the
+\lstinline!Serialize! type class, and produces a typed identifier which
 may be used to refer to the exported function. In this example, the type of
 \lstinline!greetings! is \lstinline!Export (String -> Server ())!,
 indicating that the identifier refers
@@ -306,8 +306,8 @@ This part of the program is executed on both the server and the client, albeit
 with slightly different side effects, as described in section \ref{sec:impl}.
 
 After the \lstinline!export! call, we enter the domain of client-exclusive code
-with the application of \lstinline!runClient!. This function, unsurprisingly,
-execute computations in the \lstinline!Client! monad which is essentially an
+with the application of \lstinline!runClient!. This function, execute
+computations in the \lstinline!Client! monad which is essentially an
 IO monad with cooperative multitasking added on top, to mitigate the fact that
 Javascript has no native concurrency support. \lstinline!runClient! does not
 return, and is the only function with a return type of \lstinline!App Done!,
@@ -349,11 +349,10 @@ main = runApp (mkConfig "ws://localhost:1111" 1111)
               clientMain
 \end{code}
 
-This part is entirely straightforward; the URL of the server is provided for
-the benefit of the client and the port to listen on is provided for the
-benefit of the server. The final argument is the main function of our
-application. Figure \ref{lst:hello-server} gives the code of this example in
-its entirety.
+The URL of the server is provided for the benefit of the client and the port
+to listen on is provided for the benefit of the server. The final argument is
+the main function of our application. Figure \ref{lst:hello-server} gives the
+code of this example in its entirety.
 
 Like \lstinline!runClient!, \lstinline!runApp! does not return, and is intended
 to be the only computation executed by \lstinline!main!. In fact, performing
@@ -771,7 +770,7 @@ serializable value in the \lstinline!Server! monad can be exported. The
 creating statically typed variadic functions, and works very much like the
 \lstinline!printf! function of Haskell's standard library.\ \cite{printf}
 
-The client implementation of \lstinline!export! is straightforward.
+The client implementation of \lstinline!export! is not very complex.
 
 \begin{code}
 export _ = App $ do
@@ -878,18 +877,17 @@ onMessage response = do
   putMVar mv result
 \end{code}
 
-As we can see, the implementation of our programming model is very
-straightforward and requires no bothersome compiler modifications or language
-extensions and is thus easily portable to other Haskell compilers.
+As we can see, the implementation of our programming model is rather simple
+and requires no bothersome compiler modifications or language extensions,
+and is thus easily portable to other Haskell compilers.
 
 \section{The Haste compiler}\label{sec:haste}
 
 In order to allow the same language to be used on both client and server, we
-obviously need some way to compile that language into Javascript. To this end,
-we make use of the Haste compiler\ \cite{haste}, started as an MSc thesis and
-continued as part of this work. Haste builds on the GHC compiler to provide
-the full Haskell language, including most GHC-specific extensions, in the
-browser.
+need some way to compile that language into Javascript. To this end, we make
+use of the Haste compiler\ \cite{haste}, started as an MSc thesis and continued
+as part of this work. Haste builds on the GHC compiler to provide the full
+Haskell language, including most GHC-specific extensions, in the browser.
 
 \subsection{Choosing a compiler}
 
@@ -1007,8 +1005,8 @@ Haste as an STG compiler rather than a Haskell compiler.
 The runtime data representation of Haste programs is kept as close to regular
 Javascript programs as possible. The numeric types are represented using the
 Javascript \lstinline!Number! type, which is defined as the IEEE754 double
-precision floating point type. This obviously adds some overhead to operations
-on integers as overflow and non-integer divisions must be handled. However, this
+precision floating point type. This adds some overhead to operations on
+integers as overflow and non-integer divisions must be handled. However, this
 is common practice in hand-written Javascript as well, and is generally handled
 efficiently by Javascript engines.
 
@@ -1017,9 +1015,9 @@ zero or more arguments. In Haste, these values are represented using arrays,
 with the first element representing the data constructor and the following
 values representing its arguments. For instance, the value \lstinline!42 :: Int!
 is represented as \lstinline![0, 42]!, the leading \lstinline!0! representing
-the zeroth constructor of the \lstinline!Int! type and the \lstinline!42!,
-obviously, representing the ``machine'' integer. It may seem strange that a
-limited precision integer is represented using one level of indirection rather
+the zeroth constructor of the \lstinline!Int! type and the \lstinline!42!
+representing the ``machine'' integer. It may seem strange that a limited
+precision integer is represented using one level of indirection rather
 than as a simple number, but recall that the \lstinline!Int! type is defined by
 GHC as \lstinline!data Int = I# Int#! where \lstinline!Int#! is the primitive
 type for machine integers.
@@ -1039,12 +1037,11 @@ work within the confines of an interface designed for communication on a very
 low level. For this reason Haste sports its own method for interacting with
 Javascript as well, which allows the programmer to pass any value back and
 forth between Haskell and Javascript, as long as she can come up with a way to
-translate this value between its Haskell and Javascript representations.
-Of course, not performing any translation at all is also a valid
-``translation'', which allows Haskell code to store any Javascript value for
-later retrieval without inspecting it and vice versa. The example given in
-figure \ref{lst:ffi} implements mutable variables using this custom Javascript
-interface.
+translate this value between its Haskell and Javascript representations. Not
+performing any translation at all is also a valid ``translation'', which allows
+Haskell code to store any Javascript value for later retrieval without
+inspecting it and vice versa. The example given in figure \ref{lst:ffi}
+implements mutable variables using this custom Javascript interface.
 
 \begin{listingfloat}
 \begin{code}
@@ -1093,7 +1090,7 @@ function's return value depends on its type, the programmer must explicitly
 specify the type of each function imported using \lstinline!ffi!; in this,
 Haste's custom method is no different from the conventional FFI.
 
-There are several benefits to this method, the most obvious being that new
+There are several benefits to this method, the most prominent being that new
 marshallable types can be added by simply instantiating a type class. Thanks
 to the lazy evaluation employed by Haste, each foreign function object is only
 created once and then cached; any further calls to the same (Haskell) function
@@ -1163,8 +1160,9 @@ data to be sent to and from the client respectively.
 Sunroof is completely type-safe, in the DSL itself as well as in the
 communication with the Haskell host. However, the fact that client and server
 must be written in two separate languages - any code used to generate
-Javascript must of course be built solely from the primitives of the Sunroof
-language, precluding use of general Haskell code - makes code reuse hard.
+Javascript must be built solely from the primitives of the Sunroof
+language in order to be compilable into Javascript, precluding use of general
+Haskell code - makes code reuse hard.
 
 \paragraph{Advantages to our approach} We believe that our approach has a
 number of distinct advantages to the aforementioned attacks on the problem.
@@ -1188,13 +1186,12 @@ Our programming model is implemented as a library, assuming only two Haskell
 compilers, one targeting Javascript and one targeting the programmer's server
 platform of choice. While we use Haste as our Javascript-targeting compiler,
 modifying our implementation to use GHCJS or even the Javascript backend of UHC
-would be entirely straightforward. This implementation not only allows for
-greater flexibility, but also eliminates the need to tangle with complex
-compiler internals.
+would be trivial. This implementation not only allows for greater flexibility,
+but also eliminates the need to tangle with complex compiler internals.
 
 \paragraph{Inspiration and alternatives to \lstinline!export!} One crucial
-aspect of implementing cross-network function calls is, of course, the issue of
-data representation: the client side of things must be able to obtain some
+aspect of implementing cross-network function calls is the issue of data
+representation: the client side of things must be able to obtain some
 representation of any function it may want to call on the server.
 
 In our solution, this representation is obtained through the use of the \lstinline!export! function, which when executed on the server pairs a function with a
@@ -1250,8 +1247,7 @@ this restriction makes program flow easier to follow and comprehend. Like the
 immutability of Haskell, this model gives programmers a not-so-subtle hint
 as to how they may want to structure their programs. Should this model prove
 insufficiently expressive, extending our existing model with an
-\lstinline!onClient! counterpart to \lstinline!onServer! would be relatively
-straightforward.
+\lstinline!onClient! counterpart to \lstinline!onServer! is a simple task.
 
 \paragraph{Preventing divergence} While our solution completely safe from the
 invocation point of the \lstinline!runApp! function onward, capturing
@@ -1326,7 +1322,7 @@ statistics and a wide range of other tasks. Any piece of code executing in the
 context of a particular web session may not only interact with any other piece
 of code executing in the same context, but may also perform basically limitless
 communication with third parties and may thus, inadvertently or not, leak
-information about the application state. This is obviously highly undesirable
+information about the application state. This is of course highly undesirable
 for many applications, which is why there is ongoing work in controlling the
 information flow within web applications\ \cite{jsflow}.
 
