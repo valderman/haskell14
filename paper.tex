@@ -94,13 +94,12 @@ web applications; distributed systems; network communication
 Development of web applications is no task for the faint of heart.
 The conventional method involves splitting your program into two logical parts,
 writing the one in Javascript, which is notorious even among its proponents for
-being wonky and error-prone, and the other in the current server language
-\emph{du jour}.
-Then, two are glued together using whichever home-grown network protocol seems
-to fit the application. However, most web applications are conceptually
-monolithic entities, making this forced split an undesirable hindrance which
-introduces new possibilities for defects, adds development overhead and
-prevents code reuse.
+being wonky and error-prone, and the other in any compiled or
+server-interpreted language. Then, two are glued together using whichever
+home-grown network protocol seems to fit the application. However, most web
+applications are conceptually monolithic entities, making this forced split an
+undesirable hindrance which introduces new possibilities for defects, adds
+development overhead and prevents code reuse.
 
 Several attempts have been made at tackling this problem, but none is, in our
 view, satisfactory. In this paper, we propose a functional programming model in
