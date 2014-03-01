@@ -94,7 +94,8 @@ web applications; distributed systems; network communication
 Development of web applications is no task for the faint of heart.
 The conventional method involves splitting your program into two logical parts,
 writing the one in Javascript, which is notorious even among its proponents for
-being wonky and error-prone, and the other in the current language du jour.
+being wonky and error-prone, and the other in the current server language
+\emph{du jour}.
 Then, two are glued together using whichever home-grown network protocol seems
 to fit the application. However, most web applications are conceptually
 monolithic entities, making this forced split an undesirable hindrance which
@@ -111,8 +112,8 @@ which are not explicitly declared as server-side or client-side are usable by
 either side. Our solution is implemented as a Haskell library requiring minimal
 to no compiler support, ensuring portability and modularity.
 
-This paper also describes the Haste Haskell compiler in some detail, as it is a
-crucial part of our implementation.
+As our implementation depends on the Haste Haskell to Javascript compiler, this
+paper also goes into some detail about its design and implementation.
 
 \paragraph{Motivation}
 
@@ -134,12 +135,11 @@ However, such implementation details should not be allowed to dictate the way
 we structure and reason about our applications - clearly, an abstraction is
 called for.
 
-To put make the problem a bit more concrete, let's take a look at an example.
-Let's say that we want to implement a simple ``chatbox'' component for a
-website, to allow visitors to discuss the site's content in real time. Using
-mainstream development practives and recent technologies such as WebSockets,
-we may come up with something like the program in figure
-\ref{lst:javascript-client}.
+For a more concrete example, let's say that we want to implement a simple
+``chatbox'' component for a website, to allow visitors to discuss the site's
+content in real time. Using mainstream development practices and recent
+technologies such as WebSockets\ \cite{websockets}, we may come up with
+something like the program in figure \ref{lst:javascript-client}.
 
 \begin{listingfloat}
 \begin{code}
@@ -182,7 +182,7 @@ the input text box is cleared.
 
 Messages are transmitted as strings, with the initial four characters
 indicating the type of the message and the rest being the optional payload.
-There are only two messages; a handshake indicating that a user wants to join
+There are only two messages: a handshake indicating that a user wants to join
 the conversation, and a broadcast message which sends a line of text to all
 connected users via the server. The only messages received from the server are
 new chat messages, delivered as simple strings.
@@ -228,7 +228,7 @@ following properties:
         client or the server using the type system while pure code can be
         shared by both. Additionally, general IO computations may be lifted
         into both client and server code, allowing for safe IO code reuse
-        within the confines of the client or server designated code sections.
+        within the confines of the client or server designated functions.
   \item Client-server network communication is handled through statically typed
         RPC function calls, extending the reach of Haskell's type checker over
         the network and giving the programmer advance warning when she uses
@@ -243,9 +243,9 @@ following properties:
         heterogenous client-server relation as the master helps keeping the
         program flow linear and predictable.
   \item The implementation is built as a library on top of the GHC and Haste
-        Haskell compilers, requiring little to no compiler support. Programs
-        are compiled twice; once with Haste and once with GHC, to produce the
-        final client and server side code respectively.
+        Haskell compilers, requiring little to no specialized compiler support.
+        Programs are compiled twice; once with Haste and once with GHC, to
+        produce the final client and server side code respectively.
 \end{itemize}
 
 \subsection{A first example}\label{sec:helloserver}
@@ -285,12 +285,14 @@ appMain = do
 
 The \lstinline!export! function takes an arbitrary function, provided that all
 its arguments as well as its return value are serializable through the aptly
-named \lstinline!Serialize! type class, and returns a typed ``handle'' of
-sorts. In this example, the type of \lstinline!greetings! is
-\linebreak
-\lstinline!Export (String -> Server ())!, indicating that the handle identifies
-an exported function with a single \lstinline!String! argument and no return
-value; exported functions all live in the \lstinline!Server! monad.
+named \lstinline!Serialize! type class, and produces a typed identifier which
+may be used to refer to the exported function. In this example, the type of
+\lstinline!greetings! is \lstinline!Export (String -> Server ())!,
+indicating that the identifier refers
+to an exported function with a single \lstinline!String! argument and no return
+value. Exported functions all live in the \lstinline!Server! monad.
+This part of the program is executed on both the server and the client, albeit
+with slightly different side effects, as described in section \ref{sec:impl}.
 
 After the \lstinline!export! call, we enter the domain of client-exclusive code
 with the application of \lstinline!runClient!. This function, unsurprisingly,
@@ -301,13 +303,13 @@ return, and is the only function with a return type of \lstinline!App Done!,
 which ensures that each \lstinline!App! computation contains exactly one client
 computation.
 
-In order to make an RPC call using a handle obtained from \lstinline!export!,
+In order to make an RPC call using a identifier obtained from \lstinline!export!,
 we must supply it with an argument. This is done using the \lstinline!<.>!
-operator. Upon closer inspection, the attentive reader may notice that
+operator. It might be interesting to note that its type,
 \linebreak
-its type, \lstinline!Serialize a => Export (a -> b) -> a -> Export b!,
+\lstinline!Serialize a => Export (a -> b) -> a -> Export b!,
 is very similar to the type of the \lstinline!<*>! operator over applicative
-functors. This is not a coincidence; the \lstinline!<.>! performs the same role
+functors. This is not a coincidence; \lstinline!<.>! performs the same role
 for the \lstinline!Export! type as \lstinline!<*>! performs for applicative
 functors. The reason for using a separate operator for this instead of making
 \lstinline!Export! an instance of \lstinline!Applicative! is that since
@@ -316,17 +318,19 @@ a network, such functions must only be applied to arguments which can be
 serialized and sent over a network connection. When an \lstinline!Export!
 function is applied to an argument using \lstinline!<.>!, the argument is
 serialized and stored inside the resulting \lstinline!Export! object, awaiting
-dispatch.
+dispatch. \lstinline!Export! values can thus be seen as explicit
+representations of closures.
 
-After applying the value obtained by \lstinline!prompt!ing the user for her
-name to the exported function, we apply the \lstinline!onServer! function to
-the result, which dispatches the RPC call to the server. \lstinline!onServer!
-will then block until the RPC call returns.
+After applying the value obtained from the user to the exported function,
+we apply the \lstinline!onServer! function to the result, which dispatches
+the RPC call to the server. \lstinline!onServer! will then block until the
+RPC call returns.
 
-Finally, we need to launch our application, and inform the client part of the
-whereabouts of its server counterpart; in this example the server will listen
-on port 1111, and since we will only run this application locally the client
-should attempt to contact the server at our local machine.
+Finally, we need to launch our application and inform the client part of the
+whereabouts of its server counterpart. In this example the server will listen
+for connecting clients on port 1111, and since we will only run this
+application locally the client should attempt to contact the server over the
+loopback interface.
 
 \begin{code}
 main :: IO ()
@@ -345,7 +349,7 @@ to be the only computation executed by \lstinline!main!. In fact, performing
 non-deterministic IO and allowing \lstinline!runApp! or its arguments to
 capture the result may lead to unpredictable behavior. The \lstinline!appMain!
 function should for all intents and purposes be regarded as the program's entry
-point; a non-intrusive method of enforcing this using the type system is
+point. A non-intrusive method of enforcing this using the type system is
 described in section \ref{sec:limitations}, but is not used in the examples
 given here as it relies on the use of the GHC plugin system.
 
@@ -400,7 +404,7 @@ main = do
 While this may at first seem to solve the problem of server-side state, this
 approach raises a number of questions. Does \lstinline!visitorref! live on the
 client or the server, or perhaps on both? What happens if our state holding
-element is initialized to a non-deterministic value, and what if we assign it
+element is initialized in a non-deterministic way, and what if we assign it
 a value on the server and then attempt to read that value on the client?
 Recall that, as explained in section \ref{sec:helloserver}, the function
 passed to \lstinline!runApp! should for all intents and purposes be regarded as
@@ -430,8 +434,8 @@ liftServerIO :: IO a -> App (Useless a)
 
 In contrast to \lstinline!liftIO!, the result value of \lstinline!liftServerIO!
 is wrapped in the \lstinline!Useless! type. As the name implies, this type is
-completely opaque and thus useless unless you can somehow extract its contained
-value, something which is only possible using a single function:
+completely opaque and thus useless unless its contained value can somehow be
+extracted, something which is only possible using a single function:
 
 \begin{code}
 mkUseful :: Useless a -> Server a
@@ -491,9 +495,9 @@ type RcptList = CC.MVar [Recipient]
 
 We use an \lstinline!MVar! from \lstinline!Control.Concurrent! to store the
 list of recipients. A recipient will be represented by a \lstinline!SessionID!,
-an ID used by Haste.App to identify user sessions, and an \lstinline!MVar! into
-which new chat messages sent to the recipient will be written. Next, we define
-our handshake RPC function.
+an identifier used by Haste.App to identify user sessions, and an
+\lstinline!MVar! into which new chat messages sent to the recipient will be
+written as they arrive. Next, we define our handshake RPC function.
 
 \begin{code}
 srvHello :: Useless RcptList -> Server ()
@@ -506,17 +510,17 @@ srvHello uRcpts = do
       return ((sid, rcptMVar):cs ,())
 \end{code}
 
-The handshake is a simple operation; the connecting client just gets an
-\lstinline!MVar! associated with its session identifier, and the two are then
-prepended to the recipient list. Notice how the application's server state is
-passed in as the function's first \lstinline!Useless RcptList! argument.
+The handshake is a simple operation; an \lstinline!MVar! is associated with the
+connecting client's session identifier, and the pair is prepended to the
+recipient list. Notice how the application's server state is passed in as the
+function's first \lstinline!Useless RcptList! argument.
 
 \begin{code}
 srvSend :: Useless RcptList -> String -> Server ()
 srvSend uRcpts message = do
     rcpts <- mkUseful uRcpts
     liftIO $ do
-      recipients <- CC.withMVar rcpts return
+      recipients <- CC.readMVar rcpts
       mapM_ (CC.forkIO . deliver message) recipients
   where
     deliver msg (_,rcptMVar) = CC.putMVar rcptMVar msg
@@ -525,8 +529,9 @@ srvSend uRcpts message = do
 The send function is slightly more complex. The incoming message is written to
 the \lstinline!MVar! corresponding to each active session. Note the use of
 \lstinline!forkIO!. Some recipients may be slow to empty their \lstinline!MVar!
-to make room for a new message. We don't want to force all recipients to wait
-for the slowest one, so we spawn a new lightweight thread for each recipient.
+to make room for a new message. In this case, we don't want to force all
+recipients to wait for the slowest one, so we spawn a new lightweight thread
+to handle delivery for each recipient.
 
 \begin{code}
 srvAwait :: Useless RcptList -> Server String
@@ -534,7 +539,7 @@ srvAwait uRcpts = do
   rcpts <- mkUseful uRcpts
   sid <- getSessionID
   liftIO $ do
-    recipients <- CC.withMVar rcpts return
+    recipients <- CC.readMVar rcpts
     case lookup sid recipients of
       Just mv -> CC.takeMVar mv
       _       -> fail "Unregistered session!"
@@ -573,19 +578,21 @@ appMain = do
 
 Notice that the \lstinline!recipients! list is passed to our three server
 operations \emph{before} they are exported; since \lstinline!recipients! is
-created on the server and inaccessible to the client side, it is not possible
-to pass it over the network as an RPC argument. Even if it were possible,
-passing server-private state back and forth over the network would be highly
-undesirable.
+a mutable reference created on the server and inaccessible to client code,
+it is not possible to pass it over the network as an RPC argument.
+Even if it were possible, passing server-private state back and forth over the
+network would be quite inappropriate due to privacy and security concerns.
 
-The \lstinline!withElems! function is part of Haste's DOM manipulation library;
-it locates references to the DOM nodes with the given identifiers, in this case
-the variable \lstinline!log! is bound to the node with the identifier ``log'',
-and \lstinline!inp! is bound to the node identifier by ``msg''. These are the
-same DOM nodes that were referenced in our original example, and refer
-to the chat log window and the text input field respectively. After locating
-all the needed UI elements, the client proceeds to register itself with the
-server's recipient list using the \lstinline!hello! export.
+The \lstinline!withElems! function is part of the Haste compiler's bundled DOM
+manipulation library; it locates references to the DOM nodes with the given
+identifiers and passes said references to a function.
+In this case the variable \lstinline!log! will be bound to the node
+with the identifier ``log'', and \lstinline!msgbox! will be bound to the node
+identified by ``message''. These are the same DOM nodes that were referenced in
+our original example, and refer to the chat log window and the text input
+field respectively. After locating all the needed UI elements, the client
+proceeds to register itself with the server's recipient list using the
+\lstinline!hello! export.
 
 \begin{code}
       let recvLoop chatlines = do
@@ -622,13 +629,11 @@ main =
   runApp (mkConfig "ws://localhost:1111" 1111) appMain
 \end{code}
 
-Using this approach, creating web applications with strongly typed
-communication becomes easy. The discerning reader may be slightly annoyed at
-the need to extract the contents from \lstinline!Useless! values at each point
-of use. Indeed, in a simple example such as this, the source clutter caused by
-this becomes a disproportionate irritant. Fortunately, most web applications
-tend to have more complex client-server interactions, reducing this overhead
-significantly.
+The discerning reader may be slightly annoyed at the need to extract the
+contents from \lstinline!Useless! values at each point of use. Indeed, in a
+simple example such as this, the source clutter caused by this becomes a
+disproportionate irritant. Fortunately, most web applications tend to have
+more complex client-server interactions, reducing this overhead significantly.
 
 \section{Implementation}\label{sec:impl}
 
@@ -641,41 +646,44 @@ To pass data back and forth over the network, messages are serialized using
 JSON, a fairly lightweight format used by many web applications, and sent using
 the HTML5 WebSockets API. This choice is completely arbitrary, guided purely
 by implementation convenience. It is certainly not the most performant choice,
-but can be easily replaced with something more suitable as the need arises.
+but can be trivially replaced with something more suitable as needed.
 
 The implementation described here is a slight simplification of our
 implementation, removing some performance enhancements and error handling
-clutter in the interest of clarity.
+clutter in the interest of clarity. The complete implementation is available
+for download, together with the Haste compiler, from our source repository at
+\lstinline!http://ekblad.cc/haste!.
+
 
 \paragraph{Two compilers}
 The principal trick to our solution is compiling the same program twice; once
 with a compiler that generates the server binary, and once with one that
-generates Javascript for execution on the client. Conditional compilation is
-used for a select few functions, to enable slightly different behavior on the
-client and on the server as necessary. As we believe that a monadic
-programming style is a good fit for this application, we have chosen to use
-Haskell as the base of our solution, which by default leads us to choose GHC
-as our server-side compiler. For reasons outlined in section \ref{sec:haste},
-the Haste compiler was chosen to provide the client-side code.
+generates Javascript. Conditional compilation is used for a select few
+functions, to enable slightly different behavior on the client and on the
+server as necessary. As we believe that a monadic programming style is a good
+fit for this application, we have chosen to use Haskell as the base of our
+solution, which by default leads us to choose GHC as our server-side compiler.
+For reasons outlined in section \ref{sec:haste}, the Haste compiler was chosen
+to provide the client-side code.
 
 \paragraph{The \lstinline!App! monad}
 The \lstinline!App! monad is where remote functions are declared, server state
-is initialized and program flow is finally handed over to the \lstinline!Client!
-monad. Its definition is as follows.
+is initialized and program flow is handed over to the \lstinline!Client! monad.
+Its definition is as follows.
 
 \begin{code}
 type CallID = Int
 type Method = [JSON] -> IO JSON
 type AppState = (CallID, [(CallID, Method)])
-type App = StateT AppState IO
+newtype App a = (StateT AppState IO a)
+  deriving (Functor, Applicative, Monad)
 \end{code}
 
 As we can see, \lstinline!App! is a simple state monad, with underlying IO
 capabilities to allow server-side computations to be forked from within it.
 Its \lstinline!CallID! state element contains the identifier to be given to the
 next exported function, and its other state element contains a mapping from
-identifiers to exported functions. Of course, in reality, \lstinline!App! is a
-\lstinline!newtype!, to prevent arbitrary lifting of IO computations.
+identifiers to exported functions.
 
 What makes \lstinline!App! interesting is that computations in this monad are
 executed on both the client and the server; once on server startup, and once
@@ -692,7 +700,9 @@ application's \lstinline!Client! computation whereas on the server, this
 computation is discarded, and the server instead goes into an event loop,
 waiting for calls from the client.
 
-Aside from \lstinline!runClient!, this monad has two primary operations.
+Aside from \lstinline!runClient!, the \lstinline!App! monad has two primary
+operations, both of which have slightly different implementations on the client
+and server respectively.
 
 \begin{code}
 data Useless a = Useful a | Useless
@@ -702,14 +712,29 @@ liftServerIO :: IO a -> App (Useless a)
 export :: Exportable a => a -> App (Export a)
 \end{code}
 
-The definition of \lstinline!liftServerIO! is very simple. Through the use of
-conditional compilation, on the client it simply ignores its argument and
-returns \lstinline!Useless!; recall that server-lifted IO computations are not
-observable on the client. On the server side, \lstinline!liftServerIO! executes
-its argument and wraps the computation's return value using the
+The client-side definition of \lstinline!liftServerIO! is as simple as can be.
+
+\begin{code}
+liftServerIO _ = App $ return Useless
+\end{code}
+
+Its argument is simply ignored, and an opaque dummy value is returned; recall
+that server-lifted IO computations are not observable on the client. The
+server-side implementation is only marginally more complex.
+
+\begin{code}
+liftServerIO m = App $ fmap Useful m
+\end{code}
+
+Its argument IO computation is executed, and the result is wrapped in the
 \lstinline!Useful! constructor. The counterpart function, \lstinline!mkUseful!
 simply unwraps the \lstinline!Useful! constructor and returns the contained
 value in the \lstinline!Server! monad.
+
+\begin{code}
+mkUseful :: Useless a -> Server a
+mkUseful (Useful x) = return x
+\end{code}
 
 \lstinline!export! is a more interesting function. Looking at its type, we see
 that it accepts any \lstinline!Exportable! value for its argument.
@@ -717,29 +742,27 @@ that it accepts any \lstinline!Exportable! value for its argument.
 
 \begin{code}
 class Exportable a where
-  mkExported :: a -> ([JSON] -> IO JSON)
+  mkExported :: a -> ([JSON] -> Server JSON)
 
-instance Serialize a =>
-         Exportable (Server a)
+instance Serialize a => Exportable (Server a) where
+  mkExported m = fmap toJSON m
+
 instance (Serialize a, Exportable b) =>
-         Exportable (a -> b)
+         Exportable (a -> b) where
+  mkExported f =
+    \(x:xs) -> mkExported (f $ fromJSON x) xs
 \end{code}
 
 In essence, any function, over any number of arguments, which returns a
 serializable value in the \lstinline!Server! monad can be exported. The
-\lstinline!mkExported! function makes use a well-known type class trick for
+\lstinline!mkExported! function makes use of a well-known type class trick for
 creating statically typed variadic functions, and works very much like the
 \lstinline!printf! function of Haskell's standard library.\ \cite{printf}
-From an \emph{n}-ary function, it creates a unary function which expects
-a list of \emph{n} JSON-encoded elements as its argument. When applied, its
-argument list is deserialized and passed to the exported function, and its
-return value is serialized. This allows us to easily bundle up all of an
-exported function's arguments and pass them across the network.
 
 The client implementation of \lstinline!export! is straightforward.
 
 \begin{code}
-export _ = do
+export _ = App $ do
   (next_id, exports) <- get
   put (next_id+1, exports)
   return (Export next_id [])
@@ -752,27 +775,48 @@ The server version is only marginally more complex in that it updates the
 identifier-function mapping table as well.
 
 \begin{code}
-export f = do
+export f = App $ do
   (next_id, exports) <- get
   put (next_id+1, (next_id, mkExported f) : exports)
   return (Export next_id [])
 \end{code}
 
 The second argument of the \lstinline!Export! constructor is, as the observant
-reader might have guessed, the list of arguments to be sent to the export.
-Essentially, an explicit closure is built up using the \lstinline!<.>! operator
-and sent off over the network for execution.
+reader might have guessed, the list of arguments to be sent to the export,
+to be updated as the exported function is applied using the \lstinline!<.>!
+operator.
 
 \begin{code}
 (<.>) :: Serialize a
       => Export (a -> b) -> a -> Export b
 (Export identifier args) <.> arg =
-  Export identifier (serialize arg : args)
+  Export identifier (toJSON arg : args)
 \end{code}
 
 After the \lstinline!App! computation finishes, the identifier-function mapping
 accumulated in its state is handed over to the server's event loop, where it is
 used to dispatch the proper functions for incoming calls from the client.
+
+\begin{code}
+onEvent :: [(CallID, Method)] -> JSON -> IO ()
+onEvent mapping incoming = do
+  let (nonce, identifier, args) = fromJSON incoming
+      Just f = lookup identifier mapping
+  result <- f args
+  webSocketSend $ toJSON (nonce, result)
+\end{code}
+
+The function corresponding to the RPC call's identifier is looked up in the
+identifier-function mapping and applied to the received list of arguments;
+the return value is bundled up with the a nonce, provided by the client to
+match each return value to the RPC call that produced it since there may be
+several RPC calls in progress at the same time, and sent back to the client.
+
+Note that during normal operation, it is not possible for the client to submit
+an RPC call with a non-existent call identifier, hence the irrefutable pattern
+match on \lstinline!Just f!. Should this pattern match fail, this is a sure
+sign of malicious tampering; the resulting exception is caught and the session
+is dropped as it is no longer meaningful to continue.
 
 \paragraph{The \lstinline!Client! monad and the \lstinline!onServer! function}
 As synchronous network communication is one of our stated goals, it is clear
@@ -805,11 +849,10 @@ onServer (Export identifier args) = do
   put (nonce + 1)
   mv <- createResultMVar nonce
   webSocketSend $
-    serialize (nonce, identifier, reverse args)  
+    toJSON (nonce, identifier, reverse args)  
   takeMVar mv
 \end{code}
 
-A nonce is used to pair up return values with the calls that produced them.
 After a call is dispatched, \lstinline!onServer! blocks, waiting for its
 \emph{result variable} to be filled with the result of the call. Filling this
 variable is the responsibility of the \emph{receive callback}, which is
@@ -817,33 +860,15 @@ executed every time a message arrives from the server.
 
 \begin{code}
 onMessage :: JSON -> Client ()
-onMessage msg = do
-  let (nonce, result) = deserialize msg
+onMessage response = do
+  let (nonce, result) = fromJSON response
   mv <- findResultMVar nonce
   putMVar mv result
 \end{code}
 
-The corresponding server-side event loop, which handles incoming calls from the
-client, is similarly straightforward.
-
-\begin{code}
-onEvent :: [(CallID, Method)] -> JSON -> IO ()
-onEvent mapping msg = do
-  let (nonce, identifier, args) = deserialize msg
-      Just f = lookup identifier mapping
-  result <- f args
-  webSocketSend $ serialize (nonce, result)
-\end{code}
-
-The function corresponding to the RPC call's identifier is looked up in the
-identifier-function mapping generated by the \lstinline!App! computation and
-applied to the list of arguments; the return value is bundled up with the
-call's nonce and sent back to the client. Note that during normal operation,
-it is not possible for the client to submit an RPC call with a non-existent
-call identifier, hence the irrefutable pattern match on \lstinline!Just f!.
-Should this pattern match fail, this is a sure sign of malicious tampering;
-the resulting exception is caught and the session is dropped as it is no longer
-meaningful to continue.
+As we can see, the implementation of our programming model is very
+straightforward and requires no bothersome compiler modifications or language
+extensions and is thus easily portable to other Haskell compilers.
 
 \section{The Haste compiler}\label{sec:haste}
 
@@ -874,7 +899,7 @@ the following demands of a candidate source language:
   \item The language must be compilable to both Javascript and a format
         suitable for server-side execution as we want our web applications
         to be written as a single, monolithic program.
-  \item We also want our language to be practical, in the sense that its output
+  \item We also want our compiler to be practical, in the sense that its output
         should not be disproportionately large or slow. This is more important
         for the client part, where we have to contend with slow connections and
         the overhead of running within an interpreter, than for the server part.
@@ -882,13 +907,13 @@ the following demands of a candidate source language:
 
 Our first criterion rules out the dynamically typed Erlang. The second rules
 out Fay which unfortunately lacks critical Haskell features, most notably type
-classes.
+classes, and thus has no one to one server-side counterpart compiler.
 
 This still leaves us with four options: Clean, GHCJS, Haste and UHC. However,
 the output from GHCJS is prohibitively large - often in the range of several
 megabytes for very simple programs - which rules it out for our use case, in
-spite of providing slightly better compatibility with low-level GHC features
-than Haste. Similarly, the code produced by the UHC Javascript backend tends to
+spite of providing very good compatibility with even low-level GHC features.
+Similarly, the code produced by the UHC Javascript backend tends to
 be relatively slow due to it lacking the more mature optimization capabilities
 of GHC, as well as being in the same ballpark as GHCJS for size. Haste, in
 contrast, produces code which is generally one to two orders of magnitude
@@ -897,11 +922,12 @@ smaller than that produced by GHCJS or UHC.\ \cite{haste}
 This leaves us choosing between Clean and Haste for our client compiler. Most
 of our abstractions, both the cooperative multitasking and the type-safe
 client-server communication itself, are easily expressed as monads, well
-supported in Haskell thanks to do-notation. Add the fact that one of this
-work's authors is the original author of Haste, giving us a better position to
-troubleshoot any code based thereupon, and Haste becomes the better choice.
+supported in Haskell thanks to do-notation and a culture of monadic design
+patterns. Add the fact that one of this work's authors is the original author
+of Haste, giving us a better position to troubleshoot any code based thereupon,
+and Haste becomes the better choice.
 
-\subsection{Design of the Haste compiler}
+\subsection{Design goals}
 
 Haste is first and foremost intended to be a practical compiler; the ability
 to produce code which is lean and fast enough to be used in the real world is
@@ -919,10 +945,6 @@ require modifications to the runtime system and generated code which confound
 the structure of the resulting Javascript and have a detrimental impact on code
 size and execution speed.
 
-GHCJS takes the opposite view, that faithful emulation of the GHC runtime is
-paramount. Of course, this brings an impressive degree of compatibility, at the
-cost of the blowup in code size mentioned previously.
-
 \subsection{Implementation overview}
 
 As previously mentioned, Haste offloads much of the heavy lifting of
@@ -930,7 +952,7 @@ compilation - parsing, type checking, intermediate code generation and many
 optimizations - onto GHC, and takes over code generation after the STG
 generation step, at the very end of the compilation process. STG\ \cite{stg} is
 the last intermediate representation used by GHC before the final code
-generation takes place and has several benefits for use as Haste's target
+generation takes place and has several benefits for use as Haste's source
 language:
 
 \begin{itemize}
@@ -987,7 +1009,8 @@ the zeroth constructor of the \lstinline!Int! type and the \lstinline!42!,
 obviously, representing the ``machine'' integer. It may seem strange that a
 limited precision integer is represented using one level of indirection rather
 than as a simple number, but recall that the \lstinline!Int! type is defined by
-GHC as \lstinline!data Int = I# Int#!.
+GHC as \lstinline!data Int = I# Int#! where \lstinline!Int#! is the primitive
+type for machine integers.
 
 Functions are represented as plain Javascript functions, one of the blessings
 of targeting a high level language, and application can therefore be
@@ -1041,17 +1064,17 @@ getMutable = ffi "(function(m) {return m.val;})"
 The core of this interface consists of the \lstinline!ffi! function, which
 allows the programmer to create a Haskell function from arbitrary Javascript
 code. This function exploits Javascript's ability to parse and execute
-arbitrary strings at run-time using the \lstinline!eval! function, coupled with
+arbitrary strings at run time using the \lstinline!eval! function, coupled with
 the fact that functions in Haste and in Javascript share the same
 representation, to dynamically create a function object at runtime.
 The \lstinline!ffi! function is typed using the same method as the
-\lstinline!serializify! function described in section \ref{sec:impl}.
+\lstinline!mkExported! function described in section \ref{sec:impl}.
 When applied to one or more arguments instantiating the \lstinline!Marshal!
 type class, the \lstinline!pack! function is applied to each argument,
 marshalling them into their respective Javascript representations, before they
 are passed to the dynamically created function. When that function returns,
 the inverse \lstinline!unpack! function is applied to its return value before
-it is passed back into Haskell land.
+it is passed back into the Haskell world.
 
 As the marshalling functions chosen for each argument and the foreign
 function's return value depends on its type, the programmer must explicitly
@@ -1105,10 +1128,11 @@ over the network.
 
 \paragraph{Duetto} Duetto is a C++ compiler targeting the web, written from
 the ground up to produce code for both client and server simultaneously. It
-utilizes the new attributes mechanism introduced in C++11 to designate
-functions and data to live on either client or server side. Any calls to a
-function on the other side of the network and attempts to access remote data
-are implicit, requiring no extra annotations or scaffolding at the call site.
+utilizes the new attributes mechanism introduced in C++11\ \cite{sepples11} to
+designate functions and data to live on either client or server side. Any calls
+to a function on the other side of the network and attempts to access remote
+data are implicit, requiring no extra annotations or scaffolding at the call
+site.
 
 Much like Conductance, Duetto suffers somewhat from its heritage: while the
 client-side code is not memory-unsafe, as it is not possible to generate
@@ -1116,7 +1140,7 @@ memory-unsafe Javascript code, its server-side counterpart unfortunately is.
 Our reservations expressed about how network communication in Duetto can be
 initiated implicitly apply to Duetto as well.
 
-\paragraph{Sunroof} In contrast to the Conductance and Duetto, Sunroof is an
+\paragraph{Sunroof} In contrast to Conductance and Duetto, Sunroof is an
 embedded language. Implemented as a Haskell library, it allows the programmer
 to use Haskell to write code which is compiled to Javascript and executed on
 the client. The language can best be described as having Javascript semantics
@@ -1146,62 +1170,64 @@ of data using the appropriate type classes. Aside from the obvious advantages
 of type safety, making the crossing of the network boundary explicit aids the
 programmer in making an informed decision as to when and where server
 communication is appropriate, as well as helps prevents accidental transmission
-of sensitive information intended to stay on the client.
+of sensitive information intended to stay on either side of the network.
 
 Our programming model is implemented as a library, assuming only two Haskell
 compilers, one targeting Javascript and one targeting the programmer's server
 platform of choice. While we use Haste as our Javascript-targeting compiler,
 modifying our implementation to use GHCJS or even the Javascript backend of UHC
 would be entirely straightforward. This implementation not only allows for
-greater flexibility, but also eliminates any potentially hairy interaction with
+greater flexibility, but also eliminates the need to tangle with complex
 compiler internals.
 
 \paragraph{Inspiration and alternatives to \lstinline!export!} One crucial
 aspect of implementing cross-network function calls is, of course, the issue of
 data representation: the client side of things must be able to obtain some
-representation of any function it may want to call. In our solution, this
-representation is obtained through the use of the \lstinline!export! function,
-which when executed on the server pairs a function with a unique identifier and
-on the client, and when executed on the client returns said identifier so that
-the client may now refer to the function. While this has the advantage of being
-simple to implement, one major drawback of this method is that all functions
-must be explicitly exported in the \lstinline!App! monad prior to being called
-over the network.
+representation of any function it may want to call on the server.
+
+In our solution, this representation is obtained through the use of the \lstinline!export! function, which when executed on the server pairs a function with a
+unique identifier and on the client, and when executed on the client returns
+said identifier so that the client may now refer to the function. While this
+has the advantage of being simple to implement, one major drawback of this
+method is that all functions must be explicitly exported in the \lstinline!App!
+monad prior to being called over the network.
 
 This approach was inspired by Cloud Haskell\ \cite{cloudhaskell}, which
 introduces the notion of ``static values''; values which are known at compile
-time. Codifying this in the type system, to enable it to be used as a basis for
-remote procedure calls, unfortunately requires some major changes to the
-compiler. Cloud Haskell has a stopgap measure for unmodified compilers wherein
-a remote table, pairing values with unique identifiers, are kept. This explicit
-bookkeeping relies on the programmer to assign appropriate types to both values
-themselves and their identifiers, breaking type safety.
+time. Codifying this concept in the type system, to enable it to be used as a
+basis for remote procedure calls, unfortunately requires some major changes to
+the compiler. Cloud Haskell has a stopgap measure for unmodified compilers
+wherein a remote table, pairing values with unique identifiers, are kept.
+This explicit bookkeeping relies on the programmer to assign appropriate types
+to both values themselves and their identifiers, breaking type safety.
 
 The astute reader may notice that this is exactly what the \lstinline!export!
-does as well, the difference being that \lstinline!export! links the identifier
-to the value it represents on the type level, making it impossible to call
-non-existent remote functions and break the program's type safety in other ways.
+function does as well, the difference being that \lstinline!export! links the
+identifier to the value it represents on the type level, making it impossible
+to call non-existent remote functions and break the program's type safety in
+other ways.
 
 Another approach to this problem is
 defunctionalization\ \cite{defunctionalization}, a program transformation
 wherein functions are translated into algebraic data types. This approach would
 allow the client and server to use the same actual code; rather than passing
 an identifier around, the client would instead pass the actual defunctionalized
-function. This would have the added benefit of allowing functions to be
-arbitrarily composed before being remotely invoked.
+code to the server for execution. This would have the added benefit of allowing
+functions to be arbitrarily composed before being remotely invoked.
 
 This approach also requires significant changes to the compiler, making it
 unsuitable for our use case. Moreover, we are not entirely convinced about the
 wisdom of allowing server-side execution of what is essentially arbitrary code
-sent from the client which, for web applications, is completely untrustworthy.
-While analyzing code for improper behavior is certainly possible, implementing
-and enforcing a sufficiently strict-yet-flexible security policy for remote
-execution would be an unwelcome burden on the programmer.
+sent from the client which, in a web application context, is completely
+untrustworthy. While analyzing code for improper behavior is certainly
+possible, designing and enforcing a security policy sufficiently strict to
+ensure correct behavior while flexible enough to be practically useful would be
+an unwelcome burden on the programmer.
 
 \subsection{Limitations}
 \label{sec:limitations}
 
-\paragraph{Client-centricity} Unlike any of the related works, our approach
+\paragraph{Client-centricity} Unlike Conductance and Duetto, our approach
 takes a firm stand, regarding the client as the driver in the client-server
 relationship with the server taking on the role of a passive computational
 or storage resource. The server may thus not call back into the client at
@@ -1247,23 +1273,26 @@ code which - quite reasonably - assumes that variables are consistent between
 client and server to fail.
 
 This is easily remedied however, by a slight compiler modification. Instead of
-using \lstinline!main :: IO ()! as the program entry point, introduce a function
-\lstinline!appMain :: App Done! for this purpose, and let the runtime system
-start the application by invoking \lstinline!runApp config appMain!, where
-\lstinline!config! contains the URL and port configuration for the server, given
-by the programmer using a compiler flag. As this modification only affects the
-program's entry point, which is already given ``special'' treatment in Haskell
-compilers, and may even be implemented using the plugin mechanism of GHC,
-requiring no modification of the compiler code at all, we believe this to be a
-practical, non-intrusive way to remove this limitation, and are planning on
-including this modification in our implementation.
+using \lstinline!main :: IO ()! as the program entry point, we introduce a
+function \lstinline!appMain :: App Done! for this purpose, and let the runtime
+system start the application by invoking \lstinline!runApp config appMain!,
+where \lstinline!config! contains the URL and port configuration for the
+server, given by the programmer using a compiler flag.
+
+As this modification only affects the program's entry point, which is already
+given ``special'' treatment in Haskell compilers, and may even be implemented
+using the plugin mechanism of GHC, requiring no modification of the compiler
+itself, we believe this to be a practical, non-intrusive way to remove this
+limitation, and are planning on releasing an implementation which includes
+this limitation.
 
 The astute reader may notice that the same applies to code using
 \lstinline!unsafePerformIO! to declare IO-dependent top-level values, and that
 this problem is unaffected by changing the type of the program's entry point.
 While this is indeed true, we feel that since it is quite possible to break
 any Haskell program using \lstinline!unsafePerformIO!, even subverting the type
-system, this is not a problem with our solution.
+system, ``solving'' \lstinline!unsafePerformIO! is not within the scope of this
+work.
 
 \paragraph{Environment consistency} As our programming model uses two different
 compilers to generate client and server code, it is crucial to keep the package
@@ -1289,7 +1318,7 @@ information about the application state. This is obviously highly undesirable
 for many applications, which is why there is ongoing work in controlling the
 information flow within web applications\ \cite{jsflow}.
 
-While this would indeed provide an effective defence towards attackers and
+While this does indeed provide an effective defence towards attackers and
 programming mistakes alike, there is value in being able to tell the two apart,
 as well as in catching policy violations resulting from programming mistakes
 as early as possible. An interesting venue of research would be to investigate
@@ -1359,6 +1388,9 @@ G. Guthrie. (2014, January 1). "Your transpiler to Javascript toolbox". Retrieve
 \bibitem[Hedin et al (2014)]{jsflow}
 D. Hedin, A. Birgisson, L. Bello, and A. Sabelfeld. "JSFlow: Tracking information flow in JavaScript and its APIs." In Proc. 29th ACM Symposium on Applied Computing. 2014.
 
+\bibitem[Lubbers, Greco (2010)]{websockets}
+P. Lubbers and F. Greco. "Html5 web sockets: A quantum leap in scalability for the web." SOA World Magazine (2010).
+
 \bibitem[Marlow, Peyton Jones (2004)]{fastcurry}
 S. Marlow, and S. Peyton Jones. "Making a fast curry: push/enter vs. eval/apply for higher-order languages." In ACM SIGPLAN Notices, vol. 39, no. 9, pp. 4-15. ACM, 2004.
 
@@ -1373,6 +1405,9 @@ S. Peyton Jones. "Tackling the awkward squad: monadic input/output, concurrency,
 
 \bibitem[Pignotti (2013)]{duetto}
 A. Pignotti. (2013, October 31). "Duetto: a C++ compiler for the Web going beyond emscripten and node.js". Retrieved March 1, 2014, from http://leaningtech.com/duetto/blog/2013/10/31/Duetto-Released/.
+
+\bibitem[Stroustrup (2013)]{sepples11}
+B. Stroustrup. (2014, January 21). "C++11 - the new ISO C++ standard." Retrieved March 1, 2014, from http://www.stroustrup.com/C++11FAQ.html.
 
 \bibitem[Taylor (2013)]{printf}
 C. Taylor. (2013, March 1). "Polyvariadic Functions and Printf". Retrieved March 1, 2014, from http://chris-taylor.github.io/blog/2013/03/01/how-haskell-printf-works/.
