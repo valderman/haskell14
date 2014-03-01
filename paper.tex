@@ -288,6 +288,10 @@ clientMain = do
     onServer (greetings <.> name)
 \end{code}
 
+This is the entry point of our application. Recall that Haste.App applications
+are written from the client's perspective, making this the starting point of
+the client-side code.
+
 The \lstinline!export! function takes an arbitrary function, provided that all
 its arguments as well as its return value are serializable through the aptly
 named \lstinline!Serialize! type class, and produces a typed identifier which
