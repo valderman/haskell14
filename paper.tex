@@ -108,11 +108,19 @@ server binaries are generated during compilation. Type annotations in the source
 program control which parts are executed on the server and which are executed
 on the client, and the two communicate using type safe RPC calls. Functions
 which are not explicitly declared as server-side or client-side are usable by
-either side. Our solution is implemented as a Haskell library requiring minimal
-to no compiler support, ensuring portability and modularity.
+either side.
 
-As our implementation depends on the Haste Haskell to Javascript compiler, this
-paper also goes into some detail about its design and implementation.
+Recent advances in compiler technology from functional languages to Javascript
+have led to a wealth of compilers targeting the web space, and enabled the
+practical development of functional libraries and applications for
+the browser. This enables us to implement our solution as a simple Haskell
+library for any compiler capable of producing Javascript output, requiring no
+further modification to existing compilers.
+
+As our implementation targets the Haste Haskell to Javascript compiler, this
+paper also goes into some detail about its design and implementation as well
+as the alternatives available for compiling functional languages to a browser
+environment.
 
 \paragraph{Motivation}
 
