@@ -315,9 +315,9 @@ return, and is the only function with a return type of \lstinline!App Done!,
 which ensures that each \lstinline!App! computation contains exactly one client
 computation.
 
-In order to make an RPC call using a identifier obtained from \lstinline!export!,
-we must supply it with an argument. This is done using the \lstinline!<.>!
-operator. It might be interesting to note that its type,
+In order to make an RPC call using an identifier obtained from
+\lstinline!export!, we must supply it with an argument. This is done using the
+\lstinline!<.>! operator. It might be interesting to note that its type,
 \linebreak
 \lstinline!Serialize a => Export (a -> b) -> a -> Export b!,
 is very similar to the type of the \lstinline!<*>! operator over applicative
@@ -649,6 +649,62 @@ contents from \lstinline!Useless! values at each point of use. Indeed, in a
 simple example such as this, the source clutter caused by this becomes a
 disproportionate irritant. Fortunately, most web applications tend to have
 more complex client-server interactions, reducing this overhead significantly.
+
+A complete listing of the core functions in Haste.App is given in table
+\ref{tbl:api}, and their types are given in figure \ref{lst:api}.
+
+\begin{listingfloat}
+\begin{code}
+runApp       :: AppCfg -> App Done -> IO ()
+
+runClient    :: Client () -> App Done
+liftServerIO :: IO a -> App (Useless a)
+export       :: Exportable a
+             => a -> App (Export a)
+
+onServer     :: Export (Server a) -> Client a
+(<.>)        :: Serialize a
+             => Export (a -> b) -> a -> Export b
+
+mkUseful     :: Useless a -> Server a
+getSessionID :: Server SessionID
+\end{code}
+\caption{Types of the Haste.App core functions}
+\label{lst:api}
+\end{listingfloat}
+
+\begin{table}
+\renewcommand{\arraystretch}{1.5}
+\begin{center}
+\begin{tabular}{|r|l|}
+\hline
+Function & Purpose \\
+\hline
+\lstinline!runApp! & Begin execution of a Haste.App program. \\
+\lstinline!runClient! & \parbox[t]{5cm}{Lift a single \lstinline!Client!
+computation into the \lstinline!App! monad. Must be at the very end of
+an \lstinline!App! computation, which is enforced by the type system.} \\
+\lstinline!liftServerIO! & \parbox[t]{5cm}{Lift an IO computation into the
+\lstinline!App! monad. The computation and its result are exclusive to the
+server, as enforced by the type system, and are not observable on the client.} \\
+\lstinline!export! & \parbox[t]{5cm}{Make a server-side function available to
+be called remotely by the client.} \\
+\lstinline!onServer! & \parbox[t]{5cm}{Dispatch a remote call to the server and
+wait for its completion. The result of the remote computation is returned on
+the client after it completes.} \\
+\lstinline!<.>! & \parbox[t]{5cm}{Apply an \lstinline!export!ed function to
+a serializable argument.} \\
+\lstinline!mkUseful! & \parbox[t]{5cm}{Extract the contents of a
+\lstinline!Useless! value produced by \lstinline!liftServerIO! on the server.} \\
+\lstinline!getSessionID! & \parbox[t]{5cm}{Get the unique identifier for
+the current session. This is a pure convenience function, to relieve
+programmers of the burden of session bookkeeping.} \\
+\hline
+\end{tabular}
+\end{center}
+\caption{Core functions of Haste.App}
+\label{tbl:api}
+\end{table}
 
 \section{Implementation}\label{sec:impl}
 
@@ -1312,7 +1368,7 @@ system start the application by invoking \lstinline!runApp config clientMain!,
 where \lstinline!config! contains the URL and port configuration for the
 server, given by the programmer using a compiler flag.
 
-As this modification only affects the program's entry point, which is already
+As this modification only affects the program's entry, point which is already
 given ``special'' treatment in Haskell compilers, and may even be implemented
 using the plugin mechanism of GHC, requiring no modification of the compiler
 itself, we believe this to be a practical, non-intrusive way to remove this
