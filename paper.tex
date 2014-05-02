@@ -1160,15 +1160,21 @@ needed.
 
 \subsection{Related work}
 
-Other approaches to this problem exist, notably in the form of the
-Conductance\ \cite{conductance}, Duetto\ \cite{duetto} and
-Sunroof\ \cite{sunroof} projects, all of which implement some synchronous
-abstraction over the network between the client and the server, much like our
-solution.
+Several other approaches to the seamless client-server interaction exist. In
+general, these attacks tend to be of the ``all or nothing'' variety,
+introducing new languages or otherwise requiring custom full stack solutions.
+In contrast, our solution can be implemented entirely as a library and is
+portable to any pair of compilers supporting typed monadic programming.
+Moreover, Haste.App has a quite simple and controlled programming model with a
+clearly defined controller, which stands in contrast to most related work which
+embraces a more flexible but also more complex programming model.
 
-\paragraph{Conductance} Conductance is an application server built on
-StratifiedJS, a JavaScript language extension which adds a few niceties such as
-cooperative multitasking and more concise syntax for many common tasks.
+The more notable approaches to the problem are discussed further in this section.
+
+\paragraph{Conductance} Conductance\ \cite{conductance} is an application
+server built on StratifiedJS, a JavaScript language extension which adds a few
+niceties such as cooperative multitasking and more concise syntax for many
+common tasks.
 Conductance uses an RPC-based model for client-server communication, much like
 our own, but also adds the possibility for the server to independently transmit
 data back to the client through the use of shared variables or call back into
@@ -1194,14 +1200,15 @@ provides the programmer some extra convenience, it also requires the programmer
 to exercise extra caution to avoid inadvertently sending large amounts of data
 over the network.
 
-\paragraph{Duetto} Duetto is a C++ compiler targeting the web, written from
-the ground up to produce code for both client and server simultaneously. It
-utilizes the new attributes mechanism introduced in C++11\ \cite{sepples11} to
-designate functions and data to live on either client or server side. Any calls
-to a function on the other side of the network and attempts to access remote
-data are implicit, requiring no extra annotations or scaffolding at the call
-site. Duetto is still a highly experimental project, its first release being
-only a few months old, and has not been published in any academic venue.
+\paragraph{Duetto} Duetto\ \cite{duetto} is a C++ compiler targeting the web,
+written from the ground up to produce code for both client and server
+simultaneously.
+It utilizes the new attributes mechanism introduced in C++11\ \cite{sepples11}
+to designate functions and data to live on either client or server side.
+Any calls to a function on the other side of the network and attempts to access
+remote data are implicit, requiring no extra annotations or scaffolding at the
+call site. Duetto is still a highly experimental project, its first release
+being only a few months old, and has not been published in any academic venue.
 
 Like Conductance, Duetto suffers somewhat from its heritage: while the
 client-side code is not memory-unsafe, as it is not possible to generate
@@ -1209,13 +1216,14 @@ memory-unsafe JavaScript code, its server-side counterpart unfortunately is.
 Our reservations expressed about how network communication in Duetto can be
 initiated implicitly apply to Duetto as well.
 
-\paragraph{Sunroof} In contrast to Conductance and Duetto, Sunroof is an
-embedded language. Implemented as a Haskell library, it allows the programmer
-to use Haskell to write code which is compiled to JavaScript and executed on
-the client. The language can best be described as having JavaScript semantics
-with Haskell's type system. Communication between client and server is
-accomplished through the use of ``downlinks'' and ``uplinks'', allowing for
-data to be sent to and from the client respectively.
+\paragraph{Sunroof} In contrast to Conductance and Duetto,
+Sunroof\ \cite{sunroof} is an embedded language. Implemented as a Haskell
+library, it allows the programmer to use Haskell to write code which is
+compiled to JavaScript and executed on the client. The language can best be
+described as having JavaScript semantics with Haskell's type system.
+Communication between client and server is accomplished through the use
+of ``downlinks'' and ``uplinks'', allowing for data to be sent to and from the
+client respectively.
 
 Sunroof is completely type-safe, in the DSL itself as well as in the
 communication with the Haskell host. However, the fact that client and server
@@ -1223,6 +1231,16 @@ must be written in two separate languages - any code used to generate
 JavaScript must be built solely from the primitives of the Sunroof
 language in order to be compilable into JavaScript, precluding use of general
 Haskell code - makes code reuse hard.
+
+\paragraph{AFAX} AFAX\ \cite{afax}, an F#-based solution, takes an approach
+quite similar to ours, using monads to allow client and server side to coexist
+in the same program. Unfortunately, using F# as the base of such a solution
+raises the issue of side effects. Since any expression in F# may be side
+effecting, it is quite possible with AFAX to perform a side effect on the client
+and then attempt to perform some action based on this side effect on the server.
+To cope with this, AFAX needs to introduce cumbersome extensions to the F# type
+system, making AFAX exclusive to Microsoft's F# compiler and operating system,
+whereas our solution is portable to any pair of Haskell compilers.
 
 \paragraph{Advantages to our approach} We believe that our approach has a
 number of distinct advantages to the aforementioned attacks on the problem.
@@ -1491,6 +1509,9 @@ S. Marlow, and S. Peyton Jones. "Making a fast curry: push/enter vs. eval/apply 
 
 \bibitem[Nazarov (2012)]{ghcjs}
 V. Nazarov. "GHCJS Haskell to JavaScript Compiler". Retrieved March 1, 2014, from https://github.com/ghcjs/ghcjs.
+
+\bibitem[Petricek, Syme (2007)]{afax}
+T. Petricek, and Don Syme. "AFAX: Rich client/server web applications in F#." (2007).
 
 \bibitem[Peyton Jones (1992)]{stg}
 S. Peyton Jones. "Implementing lazy functional languages on stock hardware: the Spineless Tagless G-machine." J. Funct. Program. 2, no. 2 (1992): 127-202.
