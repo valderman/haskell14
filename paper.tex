@@ -965,7 +965,9 @@ UHC\ \cite{uhc} compilers are both capable of compiling standard Haskell into
 JavaScript; the Fay\ \cite{fay} language was designed from the ground up to
 target the web space using a subset of Haskell; and there exist solutions for
 compiling Erlang\ \cite{jserlang} and Clean\ \cite{jsclean} to JavaScript as
-well.
+well. While the aforementioned compilers are the ones most interesting for
+purely functional programming, there exist a wealth of other
+JavaScript-targeting compilers, for virtually any language.
 
 Essentially, our approach is portable to any language or compiler with the
 following properties:
@@ -983,44 +985,21 @@ following properties:
         this style.
 \end{itemize}
 
-While several of the aforementioned compilers fullfil these criteria, the
-choice between them becomes almost arbitrary. We chose to base our solution on
-Haste as we, by virtue of its authorship, have an intimate knowledge of its
-internal workings, strengths and weaknesses. Without doubt, others may see many
-reasons to make a different choice.
-
-\subsection{Design goals}
-
-Haste is first and foremost intended to be a practical compiler; the ability
-to produce code which is lean and fast enough to be used in the real world is
-critical. To this end, we make several design choices and tradeoffs, some of
-which would be viewed as detrimental in a more purist context.
-
-One such tradeoff is the decision to make use of the facilities provided by the
-web browser - most prominently the JavaScript engine's native garbage
-collector - as far as possible rather than implementing parts of the GHC
-runtime in JavaScript. In the same vein, a conscious effort is made to generate
-as ``regular-looking'' code as possible. This results in large gains in code
-compactness and execution speed - in our experiences, compiler Haste programs
-are often an order of magnitude smaller and several times faster than an
-equivalent program compiled with some other Haskell to JavaScript compiler.
-
-In some rare cases, however, this means having to sacrifice compatibility with
-low-level GHC features. Most notably, Haste does not support weak references
-or pre-emptive multitasking, as these would require modifications to the
-runtime system and generated code which confound the structure of the
-resulting JavaScript and have a detrimental impact on code size and execution
-speed.
+As several of the aforementioned compilers fullfil these criteria, the
+choice between them becomes almost arbitrary. Indeed, as Haste.App is compiler
+agnostic, this decision boils down to one's personal preference. We chose to
+base our solution on Haste as we, by virtue of its authorship, have an intimate
+knowledge of its internal workings, strengths and weaknesses.
+Without doubt, others may see many reasons to make a different choice.
 
 \subsection{Implementation overview}
 
-As previously mentioned, Haste offloads much of the heavy lifting of
-compilation - parsing, type checking, intermediate code generation and many
-optimizations - onto GHC, and takes over code generation after the STG
-generation step, at the very end of the compilation process. STG\ \cite{stg} is
-the last intermediate representation used by GHC before the final code
-generation takes place and has several benefits for use as Haste's source
-language:
+Haste offloads much of the heavy lifting of compilation - parsing,
+type checking, intermediate code generation and many optimizations - onto GHC,
+and takes over code generation after the STG generation step, at the very end
+of the compilation process. STG\ \cite{stg} is the last intermediate
+representation used by GHC before the final code generation takes place and
+has several benefits for use as Haste's source language:
 
 \begin{itemize}
   \item STG is still a functional intermediate representation, based on the
@@ -1341,9 +1320,9 @@ queries. This is clearly less flexible than the back-and-forth model of Sunroof
 and Duetto or the shared variables of Conductance. However, we believe that
 this restriction makes program flow easier to follow and comprehend. Like the
 immutability of Haskell, this model gives programmers a not-so-subtle hint
-as to how they may want to structure their programs. Should this model prove
-insufficiently expressive, extending our existing model with an
-\lstinline!onClient! counterpart to \lstinline!onServer! is a simple task.
+as to how they may want to structure their programs. Extending our existing
+model with an \lstinline!onClient! counterpart to \lstinline!onServer! would be
+a simple task, but we are not quite convinced that there is value in doing so.
 
 \paragraph{Preventing divergence} While our solution is completely safe from
 the invocation point of the \lstinline!runApp! function onward, capturing
@@ -1396,8 +1375,7 @@ As this modification only affects the program's entry, point which is already
 given ``special'' treatment in Haskell compilers, and may even be implemented
 using the plugin mechanism of GHC, requiring no modification of the compiler
 itself, we believe this to be a practical, non-intrusive way to remove this
-limitation, and are planning on releasing an implementation which includes
-this limitation.
+limitation.
 
 The astute reader may notice that the same applies to code using
 \lstinline!unsafePerformIO! to declare IO-dependent top-level values, and that
