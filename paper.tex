@@ -1217,6 +1217,12 @@ JavaScript must be built solely from the primitives of the Sunroof
 language in order to be compilable into JavaScript, precluding use of general
 Haskell code - makes code reuse hard.
 
+\paragraph{Ocsigen} Ocsigen\ \cite{ocsigen} enables the development of
+client-server web applications using O'Caml. It accomplishes typed, seamless
+communication by exposing mutable variables across the network. While this is a
+quite flexible programming model, we believe that this uncontrolled, implicit
+information flow makes programs harder to follow, debug, secure and optimize.
+
 \paragraph{AFAX} AFAX\ \cite{afax}, an F\#-based solution, takes an approach
 quite similar to ours, using monads to allow client and server side to coexist
 in the same program. Unfortunately, using F\# as the base of such a solution
@@ -1451,6 +1457,9 @@ modification of existing tools or compilers.
 
 \begin{thebibliography}{}
 \softraggedright
+
+\bibitem[Balat (2006)]{ocsigen}
+V. Balat. "Ocsigen: typing web interaction with objective Caml." Proceedings of the 2006 workshop on ML. ACM, 2006.
 
 \bibitem[Bracker, Gill (2014)]{sunroof}
 J. Bracker and A. Gill. "Sunroof: A Monadic DSL for Generating JavaScript." In Practical Aspects of Declarative Languages, pp. 65-80. Springer International Publishing, 2014.
