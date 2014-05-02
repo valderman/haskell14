@@ -95,7 +95,7 @@ web applications; distributed systems; network communication
 
 Development of web applications is no task for the faint of heart.
 The conventional method involves splitting your program into two logical parts,
-writing the one in Javascript, which is notorious even among its proponents for
+writing the one in JavaScript, which is notorious even among its proponents for
 being wonky and error-prone, and the other in any compiled or
 server-interpreted language. Then, two are glued together using whichever
 home-grown network protocol seems to fit the application. However, most web
@@ -112,21 +112,21 @@ on the client, and the two communicate using type safe RPC calls. Functions
 which are not explicitly declared as server-side or client-side are usable by
 either side.
 
-Recent advances in compiler technology from functional languages to Javascript
+Recent advances in compiler technology from functional languages to JavaScript
 have led to a wealth of compilers targeting the web space, and enabled the
 practical development of functional libraries and applications for
 the browser. This enables us to implement our solution as a simple Haskell
-library for any compiler capable of producing Javascript output, requiring no
+library for any compiler capable of producing JavaScript output, requiring no
 further modification to existing compilers.
 
-As our implementation targets the Haste Haskell to Javascript compiler, this
+As our implementation targets the Haste Haskell to JavaScript compiler, this
 paper also goes into some detail about its design and implementation as well
 as the alternatives available for compiling functional languages to a browser
 environment.
 
 \paragraph{Motivation}
 
-Code written in Javascript, the only widely supported language for client-side
+Code written in JavaScript, the only widely supported language for client-side
 web applications, is often confusing and error-prone, much due to the
 language's lack of modularity, encapsulation facilities and type safety.
 
@@ -177,7 +177,7 @@ window.onload = function() {
   };
 };
 \end{code}
-\caption{Javascript chatbox implementation}
+\caption{JavaScript chatbox implementation}
 \label{lst:javascript-client}
 \end{listingfloat}
 
@@ -310,7 +310,7 @@ After the \lstinline!export! call, we enter the domain of client-exclusive code
 with the application of \lstinline!runClient!. This function executes
 computations in the \lstinline!Client! monad which is essentially an
 IO monad with cooperative multitasking added on top, to mitigate the fact that
-Javascript has no native concurrency support. \lstinline!runClient! does not
+JavaScript has no native concurrency support. \lstinline!runClient! does not
 return, and is the only function with a return type of \lstinline!App Done!,
 which ensures that each \lstinline!App! computation contains exactly one client
 computation.
@@ -570,7 +570,7 @@ the session will be automatically cleaned up on the server side and an exception
 is thrown to the client.
 
 Having implemented our three server operations, all that's left is to tie them
-to the client. In this tying, we see our main advantage over the Javascript
+to the client. In this tying, we see our main advantage over the JavaScript
 version in section \ref{sec:jsexample} in action: the \lstinline!export!
 function builds a strongly typed bridge between the client and the server,
 ensuring that any future enhancements to our chatbox program are made safely,
@@ -618,7 +618,7 @@ proceeds to register itself with the server's recipient list using the
 
 The \lstinline!recvLoop! function perpetually asks the server for new messages
 and updates the chat log whenever one arrives. Note that unlike the
-\lstinline!onmessage! callback of the Javascript version of this example,
+\lstinline!onmessage! callback of the JavaScript version of this example,
 \lstinline!recvLoop! is acting as a completely self-contained process with
 linear program flow, keeping track of its own state and only reaching out to
 the outside world to write its state to the chat log whenever necessary. As
@@ -729,7 +729,7 @@ for download, together with the Haste compiler, from our source repository at
 \paragraph{Two compilers}
 The principal trick to our solution is compiling the same program twice; once
 with a compiler that generates the server binary, and once with one that
-generates Javascript. Conditional compilation is used for a select few
+generates JavaScript. Conditional compilation is used for a select few
 functions, to enable slightly different behavior on the client and on the
 server as necessary. As we believe that a monadic programming style is a good
 fit for this application, we have chosen to use Haskell as the base of our
@@ -896,14 +896,14 @@ is dropped as it is no longer meaningful to continue.
 
 \paragraph{The \lstinline!Client! monad and the \lstinline!onServer! function}
 As synchronous network communication is one of our stated goals, it is clear
-that we will need some kind of blocking primitive. Since Javascript does not
+that we will need some kind of blocking primitive. Since JavaScript does not
 support any kind of blocking, we will have to implement this ourselves.
 
 A solution is given in the \emph{poor man's concurrency
 monad}\ \cite{concurrencymonad}. Making use of a continuation monad with
 primitive operations for forking a computation and atomically lifting an IO
 computation into the monad, it is possible to implement cooperative
-multitasking on top of the non-concurrent Javascript runtime. This monad
+multitasking on top of the non-concurrent JavaScript runtime. This monad
 allows us to implement \lstinline!MVar!s as our blocking primitive, with the
 same semantics as their regular Haskell counterpart.\ \cite{ffi}
 This concurrency-enhanced monad is used as the basis of the \lstinline!Client!
@@ -949,7 +949,7 @@ and is thus easily portable to other Haskell compilers.
 \section{The Haste compiler}\label{sec:haste}
 
 In order to allow the same language to be used on both client and server, we
-need some way to compile that language into Javascript. To this end, we make
+need some way to compile that language into JavaScript. To this end, we make
 use of the Haste compiler\ \cite{haste}, started as an MSc thesis and continued
 as part of this work. Haste builds on the GHC compiler to provide the full
 Haskell language, including most GHC-specific extensions, in the browser.
@@ -959,12 +959,12 @@ of its design and implementation which are pertinent to this work.
 
 \subsection{Choosing a compiler}
 
-Haste is by no means the only Javascript-targeting compiler for a purely
+Haste is by no means the only JavaScript-targeting compiler for a purely
 functional language. In particular, the GHC-based GHCJS\ \cite{ghcjs} and
 UHC\ \cite{uhc} compilers are both capable of compiling standard Haskell into
-Javascript; the Fay\ \cite{fay} language was designed from the ground up to
+JavaScript; the Fay\ \cite{fay} language was designed from the ground up to
 target the web space using a subset of Haskell; and there exist solutions for
-compiling Erlang\ \cite{jserlang} and Clean\ \cite{jsclean} to Javascript as
+compiling Erlang\ \cite{jserlang} and Clean\ \cite{jsclean} to JavaScript as
 well.
 
 Essentially, our approach is portable to any language or compiler with the
@@ -974,7 +974,7 @@ following properties:
   \item The language must provide a static type system, since one of our
         primary concerns is to reduce defect rates through static typing of
         the client-server communication channel.
-  \item The language must be compilable to both Javascript and a format
+  \item The language must be compilable to both JavaScript and a format
         suitable for server-side execution as we want our web applications
         to be written and compiled as a single program.
   \item We want the language to provide decent support for a monadic
@@ -997,19 +997,19 @@ critical. To this end, we make several design choices and tradeoffs, some of
 which would be viewed as detrimental in a more purist context.
 
 One such tradeoff is the decision to make use of the facilities provided by the
-web browser - most prominently the Javascript engine's native garbage
+web browser - most prominently the JavaScript engine's native garbage
 collector - as far as possible rather than implementing parts of the GHC
-runtime in Javascript. In the same vein, a conscious effort is made to generate
+runtime in JavaScript. In the same vein, a conscious effort is made to generate
 as ``regular-looking'' code as possible. This results in large gains in code
 compactness and execution speed - in our experiences, compiler Haste programs
 are often an order of magnitude smaller and several times faster than an
-equivalent program compiled with some other Haskell to Javascript compiler.
+equivalent program compiled with some other Haskell to JavaScript compiler.
 
 In some rare cases, however, this means having to sacrifice compatibility with
 low-level GHC features. Most notably, Haste does not support weak references
 or pre-emptive multitasking, as these would require modifications to the
 runtime system and generated code which confound the structure of the
-resulting Javascript and have a detrimental impact on code size and execution
+resulting JavaScript and have a detrimental impact on code size and execution
 speed.
 
 \subsection{Implementation overview}
@@ -1025,7 +1025,7 @@ language:
 \begin{itemize}
   \item STG is still a functional intermediate representation, based on the
         lambda calculus. When generating code for a high level target language
-        such as Javascript, where functions are first class objects, this
+        such as JavaScript, where functions are first class objects, this
         allows for a higher level translation than when doing traditional
         compilation to lower level targets like stack machines or register
         machines. This in turn allows us to make more efficient use of the
@@ -1048,7 +1048,7 @@ language:
         effort.
   \item Application of external functions is always saturated, as is
         application of most other functions. This allows for compiling most
-        function applications into simple Javascript function calls, limiting
+        function applications into simple JavaScript function calls, limiting
         the use of the slower dynamic techniques required to handle curried
         functions in the general case\ \cite{fastcurry} to cases where it is
         simply not possible to statically determine the arity of a function.
@@ -1060,12 +1060,12 @@ Haste as an STG compiler rather than a Haskell compiler.
 \subsection{Data representation}
 
 The runtime data representation of Haste programs is kept as close to regular
-Javascript programs as possible. The numeric types are represented using the
-Javascript \lstinline!Number! type, which is defined as the IEEE754 double
+JavaScript programs as possible. The numeric types are represented using the
+JavaScript \lstinline!Number! type, which is defined as the IEEE754 double
 precision floating point type. This adds some overhead to operations on
 integers as overflow and non-integer divisions must be handled. However, this
-is common practice in hand-written Javascript as well, and is generally handled
-efficiently by Javascript engines.
+is common practice in hand-written JavaScript as well, and is generally handled
+efficiently by JavaScript engines.
 
 Values of non-primitive data types in Haskell consist of a data constructor and
 zero or more arguments. In Haste, these values are represented using arrays,
@@ -1079,33 +1079,33 @@ than as a simple number, but recall that the \lstinline!Int! type is defined by
 GHC as \lstinline!data Int = I# Int#! where \lstinline!Int#! is the primitive
 type for machine integers.
 
-Functions are represented as plain Javascript functions, one of the blessings
+Functions are represented as plain JavaScript functions, one of the blessings
 of targeting a high level language, and application can therefore be
-implemented as its Javascript counterpart in most cases. In the general case,
+implemented as its JavaScript counterpart in most cases. In the general case,
 however, functions may be curried. For such cases where the arity of an applied
 function can not be determined statically, application is implemented using the
 eval/apply method described in\ \cite{fastcurry} instead.
 
-\subsection{Interfacing with Javascript}
+\subsection{Interfacing with JavaScript}
 
 While Haste supports the Foreign Function Interface inherited from GHC, with
 its usual features and limitations \ \cite{ffi}, it is often impractical to
 work within the confines of an interface designed for communication on a very
 low level. For this reason Haste sports its own method for interacting with
-Javascript as well, which allows the programmer to pass any value back and
-forth between Haskell and Javascript, as long as she can come up with a way to
-translate this value between its Haskell and Javascript representations. Not
+JavaScript as well, which allows the programmer to pass any value back and
+forth between Haskell and JavaScript, as long as she can come up with a way to
+translate this value between its Haskell and JavaScript representations. Not
 performing any translation at all is also a valid ``translation'', which allows
-Haskell code to store any Javascript value for later retrieval without
+Haskell code to store any JavaScript value for later retrieval without
 inspecting it and vice versa. The example given in figure \ref{lst:ffi}
-implements mutable variables using this custom Javascript interface.
+implements mutable variables using this custom JavaScript interface.
 
 \begin{listingfloat}
 \begin{code}
 import Haste.Foreign
 
 -- A MutableVar is completely opaque to Haskell code
--- and is only ever manipulated in Javascript. Thus,
+-- and is only ever manipulated in JavaScript. Thus,
 -- we use the Unpacked type to represent it,
 -- indicating a completely opaque value.
 newtype MutableVar a = MV Unpacked
@@ -1128,16 +1128,16 @@ getMutable = ffi "(function(m) {return m.val;})"
 \end{listingfloat}
 
 The core of this interface consists of the \lstinline!ffi! function, which
-allows the programmer to create a Haskell function from arbitrary Javascript
-code. This function exploits Javascript's ability to parse and execute
+allows the programmer to create a Haskell function from arbitrary JavaScript
+code. This function exploits JavaScript's ability to parse and execute
 arbitrary strings at run time using the \lstinline!eval! function, coupled with
-the fact that functions in Haste and in Javascript share the same
+the fact that functions in Haste and in JavaScript share the same
 representation, to dynamically create a function object at runtime.
 The \lstinline!ffi! function is typed using the same method as the
 \lstinline!mkExported! function described in section \ref{sec:impl}.
 When applied to one or more arguments instantiating the \lstinline!Marshal!
 type class, the \lstinline!pack! function is applied to each argument,
-marshalling them into their respective Javascript representations, before they
+marshalling them into their respective JavaScript representations, before they
 are passed to the dynamically created function. When that function returns,
 the inverse \lstinline!unpack! function is applied to its return value before
 it is passed back into the Haskell world.
@@ -1153,7 +1153,7 @@ to the lazy evaluation employed by Haste, each foreign function object is only
 created once and then cached; any further calls to the same (Haskell) function
 will reuse the cached function object. Implementation-wise, this method is also
 very non-intrusive, requiring only the use of the normal FFI to import
-Javascript's \lstinline!eval! function; no modification of the compiler is
+JavaScript's \lstinline!eval! function; no modification of the compiler is
 needed.
 
 \section{Discussion and related work}
@@ -1167,7 +1167,7 @@ abstraction over the network between the client and the server, much like our
 solution.
 
 \paragraph{Conductance} Conductance is an application server built on
-StratifiedJS, a Javascript language extension which adds a few niceties such as
+StratifiedJS, a JavaScript language extension which adds a few niceties such as
 cooperative multitasking and more concise syntax for many common tasks.
 Conductance uses an RPC-based model for client-server communication, much like
 our own, but also adds the possibility for the server to independently transmit
@@ -1179,8 +1179,8 @@ relevant publications. It is, however, used for several large scale web
 applications.
 
 While Conductance gets rid of the callback-based programming model endemic to
-regular Javascript, it still suffers from many of its usual drawbacks. In
-particular, the weak typing of Javascript poses a problem in that the
+regular JavaScript, it still suffers from many of its usual drawbacks. In
+particular, the weak typing of JavaScript poses a problem in that the
 programmer is in no way reprimanded by her tools for using server APIs
 incorrectly or trying to transmit values which can not be sensibly serialized
 and de-serialized, such as DOM nodes. Wrongly typed programs will thus crash, or
@@ -1205,14 +1205,14 @@ only a few months old, and has not been published in any academic venue.
 
 Like Conductance, Duetto suffers somewhat from its heritage: while the
 client-side code is not memory-unsafe, as it is not possible to generate
-memory-unsafe Javascript code, its server-side counterpart unfortunately is.
+memory-unsafe JavaScript code, its server-side counterpart unfortunately is.
 Our reservations expressed about how network communication in Duetto can be
 initiated implicitly apply to Duetto as well.
 
 \paragraph{Sunroof} In contrast to Conductance and Duetto, Sunroof is an
 embedded language. Implemented as a Haskell library, it allows the programmer
-to use Haskell to write code which is compiled to Javascript and executed on
-the client. The language can best be described as having Javascript semantics
+to use Haskell to write code which is compiled to JavaScript and executed on
+the client. The language can best be described as having JavaScript semantics
 with Haskell's type system. Communication between client and server is
 accomplished through the use of ``downlinks'' and ``uplinks'', allowing for
 data to be sent to and from the client respectively.
@@ -1220,8 +1220,8 @@ data to be sent to and from the client respectively.
 Sunroof is completely type-safe, in the DSL itself as well as in the
 communication with the Haskell host. However, the fact that client and server
 must be written in two separate languages - any code used to generate
-Javascript must be built solely from the primitives of the Sunroof
-language in order to be compilable into Javascript, precluding use of general
+JavaScript must be built solely from the primitives of the Sunroof
+language in order to be compilable into JavaScript, precluding use of general
 Haskell code - makes code reuse hard.
 
 \paragraph{Advantages to our approach} We believe that our approach has a
@@ -1254,9 +1254,9 @@ communication is appropriate, as well as helps prevents accidental transmission
 of sensitive information intended to stay on either side of the network.
 
 Our programming model is implemented as a library, assuming only two Haskell
-compilers, one targeting Javascript and one targeting the programmer's server
-platform of choice. While we use Haste as our Javascript-targeting compiler,
-modifying our implementation to use GHCJS or even the Javascript backend of UHC
+compilers, one targeting JavaScript and one targeting the programmer's server
+platform of choice. While we use Haste as our JavaScript-targeting compiler,
+modifying our implementation to use GHCJS or even the JavaScript backend of UHC
 would be trivial. This implementation not only allows for greater flexibility,
 but also eliminates the need to tangle with complex compiler internals.
 
@@ -1392,7 +1392,7 @@ uncompilable until this inconsistency is fixed.
 This kind of divergence can be worked around using conditional compilation, but
 is highly problematic even so; using a unified package database between the two
 compilers, while problematic due to the differing natures of native and
-Javascript compilation respectively, would be a significant improvement in this
+JavaScript compilation respectively, would be a significant improvement in this
 area.
 
 \section{Future work}
@@ -1478,7 +1478,7 @@ A. Ekblad. "Towards a declarative web." Master of Science Thesis, University of 
 J. Epstein, A. P. Black, and S. Peyton-Jones. "Towards Haskell in the cloud." In ACM SIGPLAN Notices, vol. 46, no. 12, pp. 118-129. ACM, 2011.
 
 \bibitem[Guthrie (2014)]{jserlang}
-G. Guthrie. (2014, January 1). "Your transpiler to Javascript toolbox". Retrieved March 1, 2014, from http://luvv.ie/2014/01/21/your-transpiler-to-javascript-toolbox/.
+G. Guthrie. (2014, January 1). "Your transpiler to JavaScript toolbox". Retrieved March 1, 2014, from http://luvv.ie/2014/01/21/your-transpiler-to-javascript-toolbox/.
 
 \bibitem[Hedin et al (2014)]{jsflow}
 D. Hedin, A. Birgisson, L. Bello, and A. Sabelfeld. "JSFlow: Tracking information flow in JavaScript and its APIs." In Proc. 29th ACM Symposium on Applied Computing. 2014.
@@ -1490,7 +1490,7 @@ P. Lubbers and F. Greco. "Html5 web sockets: A quantum leap in scalability for t
 S. Marlow, and S. Peyton Jones. "Making a fast curry: push/enter vs. eval/apply for higher-order languages." In ACM SIGPLAN Notices, vol. 39, no. 9, pp. 4-15. ACM, 2004.
 
 \bibitem[Nazarov (2012)]{ghcjs}
-V. Nazarov. "GHCJS Haskell to Javascript Compiler". Retrieved March 1, 2014, from https://github.com/ghcjs/ghcjs.
+V. Nazarov. "GHCJS Haskell to JavaScript Compiler". Retrieved March 1, 2014, from https://github.com/ghcjs/ghcjs.
 
 \bibitem[Peyton Jones (1992)]{stg}
 S. Peyton Jones. "Implementing lazy functional languages on stock hardware: the Spineless Tagless G-machine." J. Funct. Program. 2, no. 2 (1992): 127-202.
