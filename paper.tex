@@ -1177,7 +1177,16 @@ We are also not completely convinced that the ability to implicitly pass data
 back and forth over the network is a unilaterally good thing; while this indeed
 provides the programmer some extra convenience, it also requires the programmer
 to exercise extra caution to avoid inadvertently sending large amounts of data
-over the network.
+over the network or leak sensitive information.
+
+\paragraph{Opa} The Opa framework\ \cite{opa}, much like Conductance, enables
+seamless communication within the JavaScript language itself.
+While Opa improves upon Conductance by introducing non-mandatory type checking
+to the JavaScript world, its communication model is based on implicit
+information flows, allowing the server to read and update mutable state on the
+client and vice versa. While this is a quite flexible programming model, we
+believe that this uncontrolled, implicit information flow makes programs harder
+to follow, debug, secure and optimize.
 
 \paragraph{Google Web Toolkit} Google Web Toolkit\ \cite{gwt}, a Java
 compiler targeting the browser, provides its own solution to client-server
@@ -1218,10 +1227,11 @@ language in order to be compilable into JavaScript, precluding use of general
 Haskell code - makes code reuse hard.
 
 \paragraph{Ocsigen} Ocsigen\ \cite{ocsigen} enables the development of
-client-server web applications using O'Caml. It accomplishes typed, seamless
-communication by exposing mutable variables across the network. While this is a
-quite flexible programming model, we believe that this uncontrolled, implicit
-information flow makes programs harder to follow, debug, secure and optimize.
+client-server web applications using O'Caml. Much like Opa, it accomplishes
+typed, seamless communication by exposing mutable variables across the network,
+giving it many of the same drawbacks and benefits. While Ocsigen is a full
+stack solution, denying the developer some flexibility in choosing their tools,
+it should be noted that said stack is rather comprehensive and well tested.
 
 \paragraph{AFAX} AFAX\ \cite{afax}, an F\#-based solution, takes an approach
 quite similar to ours, using monads to allow client and server side to coexist
@@ -1502,6 +1512,9 @@ S. Marlow, and S. Peyton Jones. "Making a fast curry: push/enter vs. eval/apply 
 
 \bibitem[Nazarov (2012)]{ghcjs}
 V. Nazarov. "GHCJS Haskell to JavaScript Compiler". Retrieved March 1, 2014, from https://github.com/ghcjs/ghcjs.
+
+\bibitem[The Opa framework for JavaScript (2014)]{opa}
+The Opa framework for JavaScript. Retrieved May 2, 2014, from http://opalang.org.
 
 \bibitem[Petricek, Syme (2007)]{afax}
 T. Petricek, and Don Syme. "AFAX: Rich client/server web applications in F\#." (2007).
