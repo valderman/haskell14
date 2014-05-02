@@ -97,7 +97,7 @@ Development of web applications is no task for the faint of heart.
 The conventional method involves splitting your program into two logical parts,
 writing the one in JavaScript, which is notorious even among its proponents for
 being wonky and error-prone, and the other in any compiled or
-server-interpreted language. Then, two are glued together using whichever
+server-interpreted language. Then, the two are glued together using whichever
 home-grown network protocol seems to fit the application. However, most web
 applications are conceptually single entities, making this forced split an
 undesirable hindrance which introduces new possibilities for defects, adds
@@ -109,7 +109,7 @@ which a web application is written as a single program from which client and
 server binaries are generated during compilation. Type annotations in the source
 program control which parts are executed on the server and which are executed
 on the client, and the two communicate using type safe RPC calls. Functions
-which are not explicitly declared as server-side or client-side are usable by
+which are not explicitly declared as server side or client side are usable by
 either side.
 
 Recent advances in compiler technology from functional languages to JavaScript
@@ -126,7 +126,7 @@ environment.
 
 \paragraph{Motivation}
 
-Code written in JavaScript, the only widely supported language for client-side
+Code written in JavaScript, the only widely supported language for client side
 web applications, is often confusing and error-prone, much due to the
 language's lack of modularity, encapsulation facilities and type safety.
 
@@ -199,7 +199,7 @@ new chat messages, delivered as simple strings.
 
 This code looks solid enough by web standards, but even this simple piece of
 code contains no less than three asynchronous callbacks, two of which both read
-and and modify the application's global state. This makes the program flow
+and modify the application's global state. This makes the program flow
 non-obvious, and introduces unnecessary risk and complexity through the
 haphazard state modifications.
 
@@ -221,7 +221,7 @@ client/server architectures and network protocol design at all?
 
 \section{A seamless programming model}
 
-There are many conveivable improvements to the mainstream web development model
+There are many conceivable improvements to the mainstream web development model
 described in the previous section. We propose an alternative programming model
 based on Haskell, in which web applications are written as a single program
 rather than as two independent parts that just so happen to talk to each other.
@@ -293,7 +293,7 @@ clientMain = do
 
 This is the entry point of our application. Recall that Haste.App applications
 are written from the client's perspective, making this the starting point of
-the client-side code.
+the client side code.
 
 The \lstinline!export! function takes an arbitrary function, provided that all
 its arguments as well as its return value are serializable through the
@@ -388,10 +388,10 @@ main = runApp (mkConfig "ws://localhost:1111" 1111)
 \label{lst:hello-server}
 \end{listingfloat}
 
-\subsection{Using server-side state}
+\subsection{Using server side state}
 
 While the Hello Server example illustrates how client-server communication is
-handled, most web applications need to keep some server-side state as well.
+handled, most web applications need to keep some server side state as well.
 At first glance, this would seem to be a trivial problem; can we not just
 create our state holding elements in \lstinline!main! as usual?
 Figure \ref{lst:bad-state} describes an attempt at a solution using this idea.
@@ -408,11 +408,11 @@ main = do
       visitors <- onServer count
       alert ("Your are visitor #" ++ show visitors)
 \end{code}
-\caption{Server-side state: a misguided first attempt}
+\caption{server side state: a misguided first attempt}
 \label{lst:bad-state}
 \end{listingfloat}
 
-While this may at first seem to solve the problem of server-side state, this
+While this may at first seem to solve the problem of server side state, this
 approach raises a number of questions. Does \lstinline!visitorref! live on the
 client or the server, or perhaps on both? What happens if our state holding
 element is initialized in a non-deterministic way, and what if we assign it
@@ -458,7 +458,7 @@ a useful one lives in the server monad. Any client side code is thus free to
 completely ignore executing computations lifted using \lstinline!liftServerIO!;
 since the result of a server lifted computation is never observable on the
 client, the client has no obligation to even produce such a value.
-Figure \ref{lst:good-state} shows how to make proper use of server-side state.
+Figure \ref{lst:good-state} shows how to make proper use of server side state.
 
 \begin{listingfloat}
 \begin{code}
@@ -474,7 +474,7 @@ main =
       visitors <- onServer count
       alert ("Your are visitor #" ++ show visitors)
 \end{code}
-\caption{Server-side state: doing it properly}
+\caption{server side state: doing it properly}
 \label{lst:good-state}
 \end{listingfloat}
 
@@ -524,7 +524,7 @@ srvHello uRcpts = do
 The handshake is a simple operation; an \lstinline!MVar! is associated with the
 connecting client's session identifier, and the pair is prepended to the
 recipient list. Notice how the application's server state is passed in as the
-function's first \lstinline!Useless RcptList! argument.
+function's argument.
 
 \begin{code}
 srvSend :: Useless RcptList -> String -> Server ()
@@ -687,7 +687,7 @@ an \lstinline!App! computation, which is enforced by the type system.} \\
 \lstinline!liftServerIO! & \parbox[t]{5cm}{Lift an IO computation into the
 \lstinline!App! monad. The computation and its result are exclusive to the
 server, as enforced by the type system, and are not observable on the client.} \\
-\lstinline!export! & \parbox[t]{5cm}{Make a server-side function available to
+\lstinline!export! & \parbox[t]{5cm}{Make a server side function available to
 be called remotely by the client.} \\
 \lstinline!onServer! & \parbox[t]{5cm}{Dispatch a remote call to the server and
 wait for its completion. The result of the remote computation is returned on
@@ -733,9 +733,9 @@ generates JavaScript. Conditional compilation is used for a select few
 functions, to enable slightly different behavior on the client and on the
 server as necessary. As we believe that a monadic programming style is a good
 fit for this application, we have chosen to use Haskell as the base of our
-solution, which by default leads us to choose GHC as our server-side compiler.
+solution, which by default leads us to choose GHC as our server side compiler.
 For reasons outlined in section \ref{sec:haste}, the Haste compiler was chosen
-to provide the client-side code.
+to provide the client side code.
 
 \paragraph{The \lstinline!App! monad}
 The \lstinline!App! monad is where remote functions are declared, server state
@@ -751,7 +751,7 @@ newtype App a = App (StateT AppState IO a)
 \end{code}
 
 As we can see, \lstinline!App! is a simple state monad, with underlying IO
-capabilities to allow server-side computations to be forked from within it.
+capabilities to allow server side computations to be forked from within it.
 Its \lstinline!CallID! state element contains the identifier to be given to the
 next exported function, and its other state element contains a mapping from
 identifiers to exported functions.
@@ -763,10 +763,10 @@ depending on whether they are executed on the client or on the server.
 Execution is deterministic, ensuring that the same sequence of
 \lstinline!CallID!s are generated during every run, both on the server and on
 all clients. This is necessary to ensure that any particular call identifier
-always refers to the same server-side function on all clients.
+always refers to the same server side function on all clients.
 
 After all common code has been executed, the program flow diverges between the
-client and the server; client-side, \lstinline!runClient! launches the
+client and the server; client side, \lstinline!runClient! launches the
 application's \lstinline!Client! computation whereas on the server, this
 computation is discarded, and the server instead goes into an event loop,
 waiting for calls from the client.
@@ -783,7 +783,7 @@ liftServerIO :: IO a -> App (Useless a)
 export :: Exportable a => a -> App (Export a)
 \end{code}
 
-The client-side definition of \lstinline!liftServerIO! is as simple as can be.
+The client side definition of \lstinline!liftServerIO! is as simple as can be.
 
 \begin{code}
 liftServerIO _ = App $ return Useless
@@ -791,7 +791,7 @@ liftServerIO _ = App $ return Useless
 
 Its argument is simply ignored, and an opaque dummy value is returned; recall
 that server-lifted IO computations are not observable on the client. The
-server-side implementation is only marginally more complex.
+server side implementation is only marginally more complex.
 
 \begin{code}
 liftServerIO m = App $ fmap Useful m
@@ -845,7 +845,7 @@ so that it can be optimized out of existence in the client version of the code.
 The server version is only marginally more complex in that it updates the
 identifier-function mapping table as well.
 
-This concept of client-side identifiers being sent to the server and used as
+This concept of client side identifiers being sent to the server and used as
 indices into a table mapping identifiers to remotely accessible functions is an
 extension of the concept of ``static values'' introduced by Epstein et al with
 Cloud Haskell\ \cite{cloudhaskell}, which is discussed further in section
@@ -883,10 +883,10 @@ onEvent mapping incoming = do
 \end{code}
 
 The function corresponding to the RPC call's identifier is looked up in the
-identifier-function mapping and applied to the received list of arguments;
-the return value is bundled up with the a nonce, provided by the client to
-match each return value to the RPC call that produced it since there may be
-several RPC calls in progress at the same time, and sent back to the client.
+identifier-function mapping and applied to the received list of arguments.
+The return value is paired with a nonce provided by the client to tie it to
+its corresponding RPC call, since there may be several such calls in progress
+at the same time. The pair is then sent back to the client.
 
 Note that during normal operation, it is not possible for the client to submit
 an RPC call with a non-existent call identifier, hence the irrefutable pattern
@@ -975,10 +975,10 @@ following properties:
         primary concerns is to reduce defect rates through static typing of
         the client-server communication channel.
   \item The language must be compilable to both JavaScript and a format
-        suitable for server-side execution as we want our web applications
+        suitable for server side execution as we want our web applications
         to be written and compiled as a single program.
   \item We want the language to provide decent support for a monadic
-        programming style, as we our abstractions for cooperative multitasking
+        programming style, as our abstractions for cooperative multitasking
         and synchronous client-server communication are neatly expressible in
         this style.
 \end{itemize}
@@ -1211,8 +1211,8 @@ call site. Duetto is still a highly experimental project, its first release
 being only a few months old, and has not been published in any academic venue.
 
 Like Conductance, Duetto suffers somewhat from its heritage: while the
-client-side code is not memory-unsafe, as it is not possible to generate
-memory-unsafe JavaScript code, its server-side counterpart unfortunately is.
+client side code is not memory-unsafe, as it is not possible to generate
+memory-unsafe JavaScript code, its server side counterpart unfortunately is.
 Our reservations expressed about how network communication in Duetto can be
 initiated implicitly apply to Duetto as well.
 
@@ -1251,7 +1251,7 @@ may be of use to both client and server is effortlessly shared, leading to less
 duplication of code and increased possibilities for reusing third party
 libraries.
 
-Interactive multiplayer games is one type of application where this code
+Interactive multiplayer games are one type of application where this code
 sharing may have a large impact. In order to ensure that players are not
 cheating, a game server must keep track of the entire game state and send
 updates to clients at regular intervals. However, due to network latency,
@@ -1296,7 +1296,7 @@ introduces the notion of ``static values''; values which are known at compile
 time. Codifying this concept in the type system, to enable it to be used as a
 basis for remote procedure calls, unfortunately requires some major changes to
 the compiler. Cloud Haskell has a stopgap measure for unmodified compilers
-wherein a remote table, pairing values with unique identifiers, are kept.
+wherein a remote table, pairing values with unique identifiers, is kept.
 This explicit bookkeeping relies on the programmer to assign appropriate types
 to both values themselves and their identifiers, breaking type safety.
 
@@ -1316,7 +1316,7 @@ functions to be arbitrarily composed before being remotely invoked.
 
 This approach also requires significant changes to the compiler, making it
 unsuitable for our use case. Moreover, we are not entirely convinced about the
-wisdom of allowing server-side execution of what is essentially arbitrary code
+wisdom of allowing server side execution of what is essentially arbitrary code
 sent from the client which, in a web application context, is completely
 untrustworthy. While analyzing code for improper behavior is certainly
 possible, designing and enforcing a security policy sufficiently strict to
@@ -1330,7 +1330,7 @@ an unwelcome burden on the programmer.
 takes a firm stand, regarding the client as the driver in the client-server
 relationship with the server taking on the role of a passive computational
 or storage resource. The server may thus not call back into the client at
-arbitrary points but is instead limited to returning answers to client-side
+arbitrary points but is instead limited to returning answers to client side
 queries. This is clearly less flexible than the back-and-forth model of Sunroof
 and Duetto or the shared variables of Conductance. However, we believe that
 this restriction makes program flow easier to follow and comprehend. Like the
@@ -1339,8 +1339,8 @@ as to how they may want to structure their programs. Should this model prove
 insufficiently expressive, extending our existing model with an
 \lstinline!onClient! counterpart to \lstinline!onServer! is a simple task.
 
-\paragraph{Preventing divergence} While our solution completely safe from the
-invocation point of the \lstinline!runApp! function onward, capturing
+\paragraph{Preventing divergence} While our solution is completely safe from
+the invocation point of the \lstinline!runApp! function onward, capturing
 IO-dependent variables introduced before this invocation may lead to the client
 and server execution paths diverging. Recall that our solution does not modify
 either of the compilers used. As such, both will produce code to execute all
