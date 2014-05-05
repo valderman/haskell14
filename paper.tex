@@ -1245,11 +1245,13 @@ type system, making AFAX exclusive to Microsoft's F\# compiler and operating
 system, whereas our solution is portable to any pair of Haskell compilers.
 
 \paragraph{HOP, Links, Ur/Web and others} In addition to solutions which work
-within existing languages, there are several languages specifically created to
-target the web domain. These languages tend to target not only the client and
-server tiers, but the database tier as well. These languages bring many new,
-interesting ideas to the table but suffers from not being compatible with any
-more established languages.
+within existing languages, there are several languages specifically crafted
+targeting the web domain. These languages target not only the client and server
+tiers but the database tier as well, and incorporate several interesting new
+ideas such as more expressive type systems and inclusion of typed inline XML
+code.\ \cite{hop}\cite{links}\cite{urweb} As our solution aims to bring typed,
+seamless communication into the existing Haskell ecosystem without language
+modifications, these languages solve a different set of problems.
 
 \paragraph{Advantages to our approach} We believe that our approach has a
 number of distinct advantages to the aforementioned attacks on the problem.
@@ -1482,8 +1484,14 @@ V. Balat. "Ocsigen: typing web interaction with objective Caml." Proceedings of 
 \bibitem[Bracker, Gill (2014)]{sunroof}
 J. Bracker and A. Gill. "Sunroof: A Monadic DSL for Generating JavaScript." In Practical Aspects of Declarative Languages, pp. 65-80. Springer International Publishing, 2014.
 
+\bibitem[Chlipala (2010)]{urweb}
+A. Chlipala. "Ur: statically-typed metaprogramming with type-level record computation." ACM Sigplan Notices. Vol. 45. No. 6. ACM, 2010.
+
 \bibitem[Claessen (1999)]{concurrencymonad}
 K. Claessen. "Functional Pearls: A poor man's concurrency monad." Journal of Functional Programming 9 (1999): 313-324.
+
+\bibitem[Cooper et al (1999)]{links}
+E. Cooper, S. Lindley, P. Wadler, and J. Yallop. Links: Web programming without tiers. In Formal Methods for Components and Objects (pp. 266-296). Springer Berlin Heidelberg, 2007.
 
 \bibitem[Conductance application server (2014)]{conductance}
 The Conductance application server. Retrieved March 1, 2014, from http://conductance.io.
@@ -1535,6 +1543,9 @@ S. Peyton Jones. "Tackling the awkward squad: monadic input/output, concurrency,
 
 \bibitem[Pignotti (2013)]{duetto}
 A. Pignotti. (2013, October 31). "Duetto: a C++ compiler for the Web going beyond emscripten and node.js". Retrieved March 1, 2014, from http://leaningtech.com/duetto/blog/2013/10/31/Duetto-Released/.
+
+\bibitem[Serrano et al (2006)]{hop}
+M. Serrano, E. Gallesio, and F. Loitsch. "Hop: a language for programming the web 2. 0." OOPSLA Companion. 2006.
 
 \bibitem[Stroustrup (2013)]{sepples11}
 B. Stroustrup. (2014, January 21). "C++11 - the new ISO C++ standard." Retrieved March 1, 2014, from http://www.stroustrup.com/C++11FAQ.html.
