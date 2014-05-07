@@ -400,26 +400,27 @@ nowhere else. This is accomplished using a more restricted version of
 \lstinline!liftIO!:
 
 \begin{code}
-liftServerIO :: IO a -> App (Remote a)
+liftServerIO :: IO a -> App (RemoteValue a)
 \end{code}
 
 In contrast to \lstinline!liftIO!, the result value of \lstinline!liftServerIO!
-is wrapped in the abstract \lstinline!Remote! type. As the name implies,
+is wrapped in the abstract \lstinline!RemoteValue! type. As the name implies,
 values of this type live exclusively on the server. In order to inspect such a
 value is needs to be extracted somehow, something which is only possible using
 a single function:
 
 \begin{code}
-use :: Remote a -> Server a
+use :: RemoteValue a -> Server a
 \end{code}
 
 Therein lies the secret to restricting \lstinline!liftServerIO! to the
-server: the only function capable of turning a \lstinline!Remote! value into
-a useful one lives in the server monad. Any client side code is thus free to
-completely ignore executing computations lifted using \lstinline!liftServerIO!;
-since the result of a server lifted computation is never observable on the
-client, the client has no obligation to even produce such a value.
-Figure \ref{lst:good-state} shows how to make proper use of server side state.
+server: the only function capable of turning a \lstinline!RemoteValue! into
+one that can be inspected lives in the server monad. Any client side code is
+thus free to completely ignore executing computations lifted using
+\lstinline!liftServerIO!; since the result of a server lifted computation is
+never observable on the client, the client has no obligation to even produce
+such a value. Figure \ref{lst:good-state} shows how to make proper use of
+server side state.
 
 \begin{listingfloat}
 \begin{code}
