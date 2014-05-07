@@ -659,11 +659,11 @@ The principal trick to our solution is compiling the same program twice; once
 with a compiler that generates the server binary, and once with one that
 generates JavaScript. Conditional compilation is used for a select few
 functions, to enable slightly different behavior on the client and on the
-server as necessary. As we believe that a monadic programming style is a good
-fit for this application, we have chosen to use Haskell as the base of our
-solution, which by default leads us to choose GHC as our server side compiler.
-For reasons outlined in section \ref{sec:haste}, the Haste compiler was chosen
-to provide the client side code.
+server as necessary. Using Haskell as the base language of our solution leads
+us to choose GHC as our server side compiler by default. We chose the Haste
+compiler to provide the client side code, mainly owing to our great familiarity
+with it and its handy ability to make use of vanilla Haskell packages from
+Hackage.
 
 \paragraph{The \lstinline!App! monad}
 The \lstinline!App! monad is where remote functions are declared, server state
