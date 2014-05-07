@@ -244,7 +244,7 @@ Our proposed model, dubbed ``Haste.App'', has the following properties:
         network services incorrectly or forgets to update communication code
         as the application's internal protocol changes.
   \item Our model takes the view that the client side is the main driver when
-        developing web applications and accordingly delegates the server to
+        developing web applications and accordingly assigns the server
         the role of a computational and/or storage resource, tasked with
         servicing client requests rather than driving the program. While it is
         entirely possible to implement a server-to-client communication channel
@@ -283,8 +283,8 @@ Next, we need to make the \lstinline!helloServer! function available as an RPC
 function and call it from the client.
 
 \begin{code}
-clientMain :: App Done
-clientMain = do
+main :: App Done
+main = do
   greetings <- export helloServer
 
   runClient $ do
@@ -292,9 +292,11 @@ clientMain = do
     onServer (greetings <.> name)
 \end{code}
 
-This is the entry point of our application. Recall that Haste.App applications
-are written from the client's perspective, making this the starting point of
-the client side code.
+The \lstinline!main! function is, as usual, the entry point of our application.
+In contrast to traditional applications which live either on the client or on
+the server and begin in the \lstinline!IO! monad, Haste.App applications live
+on both and begin execution in the \lstinline!App! monad which provides some
+crucial tools to facilitate typed communication between the two.
 
 The \lstinline!export! function takes an arbitrary function, provided that all
 its arguments as well as its return value are serializable through the
@@ -339,31 +341,7 @@ we apply the \lstinline!onServer! function to the result, which dispatches
 the RPC call to the server. \lstinline!onServer! will then block until the
 RPC call returns.
 
-Finally, we need to launch our application and inform the client part of the
-whereabouts of its server counterpart. In this example the server will listen
-for connecting clients on port 1111, and since we will only run this
-application locally the client should attempt to contact the server over the
-loopback interface.
-
-\begin{code}
-main :: IO ()
-main = runApp (mkConfig "ws://localhost:1111" 1111)
-              clientMain
-\end{code}
-
-The URL of the server is provided for the benefit of the client and the port
-to listen on is provided for the benefit of the server. The final argument is
-the main function of our application. Figure \ref{lst:hello-server} gives the
-code of this example in its entirety.
-
-Like \lstinline!runClient!, \lstinline!runApp! does not return, and is intended
-to be the only computation executed by \lstinline!main!. In fact, performing
-non-deterministic IO and allowing \lstinline!runApp! or its arguments to
-capture the result may lead to unpredictable behavior. The \lstinline!clientMain!
-function should for all intents and purposes be regarded as the program's entry
-point. A non-intrusive method of enforcing this using the type system is
-described in section \ref{sec:limitations}, but is not used in the examples
-given here as it relies on the use of the GHC plugin system.
+Figure \ref{lst:hello-server} gives the code of this example in its entirety.
 
 \begin{listingfloat}
 \begin{code}
@@ -373,17 +351,13 @@ helloServer :: String -> Server ()
 helloServer name =
   liftIO $ putStrLn (name ++ " says hello!")
 
-clientMain :: App Done
-clientMain = do
+main :: App Done
+main = do
   greetings <- export helloServer
 
   runClient $ do
     name <- prompt "Hi there, what is your name?"
     onServer (greetings <.> name)
-
-main :: IO ()
-main = runApp (mkConfig "ws://localhost:1111" 1111)
-              clientMain
 \end{code}
 \caption{A seamless programming model: Hello Server}
 \label{lst:hello-server}
@@ -393,68 +367,30 @@ main = runApp (mkConfig "ws://localhost:1111" 1111)
 
 While the Hello Server example illustrates how client-server communication is
 handled, most web applications need to keep some server side state as well.
-At first glance, this would seem to be a trivial problem; can we not just
-create our state holding elements in \lstinline!main! as usual?
-Figure \ref{lst:bad-state} describes an attempt at a solution using this idea.
+How can we create state holding elements for the server which are not
+accessible to the client?
 
-\begin{listingfloat}
-\begin{code}
-main = do
-  visitorref <- newIORef 0
-  runApp config $ do
-    count <- export . liftIO $ do
-      atomicModifyIORef visitorref (\v -> (v+1, v+1))
-
-    runClient $ do
-      visitors <- onServer count
-      alert ("Your are visitor #" ++ show visitors)
-\end{code}
-\caption{server side state: a misguided first attempt}
-\label{lst:bad-state}
-\end{listingfloat}
-
-While this may at first seem to solve the problem of server side state, this
-approach raises a number of questions. Does \lstinline!visitorref! live on the
-client or the server, or perhaps on both? What happens if our state holding
-element is initialized in a non-deterministic way, and what if we assign it
-a value on the server and then attempt to read that value on the client?
-Recall that, as explained in section \ref{sec:helloserver}, the function
-passed to \lstinline!runApp! should for all intents and purposes be regarded as
-the program's entry point.
-
-To allow the use of server state while treating the final argument to
-\lstinline!runApp! (from here on always referred to as \lstinline!clientMain!)
-as the program's entry point, we may want to allow arbitrary IO computations to
-be lifted into the \lstinline!App! monad:
+To accomplish this, we need to introduce a way to lift arbitrary IO
+computations, but ensure that said computations are executed on the server and
+nowhere else. This is accomplished using a more restricted version of
+\lstinline!liftIO!:
 
 \begin{code}
-main = runApp config $ do
-  visitorref <- liftIO $ newIORef 0
-  ...
-\end{code}
-
-However, this does not answer the question of where \lstinline!visitorref!
-lives or where any side effects caused by its creation will take place.
-To solve this problem once and for all, we need to introduce a way to lift
-arbitrary IO computations, but ensure that said computations are executed on
-the server and nowhere else. This is accomplished using a more restricted
-version of \lstinline!liftIO!:
-
-\begin{code}
-liftServerIO :: IO a -> App (Useless a)
+liftServerIO :: IO a -> App (Remote a)
 \end{code}
 
 In contrast to \lstinline!liftIO!, the result value of \lstinline!liftServerIO!
-is wrapped in the \lstinline!Useless! type. As the name implies, this type is
-completely opaque and thus useless unless its contained value can somehow be
-extracted, something which is only possible using a single function:
+is wrapped in the abstract \lstinline!Remote! type. As the name implies,
+values of this type live exclusively on the server. In order to inspect such a
+value is needs to be extracted somehow, something which is only possible using
+a single function:
 
 \begin{code}
-mkUseful :: Useless a -> Server a
+fromRemote :: Remote a -> Server a
 \end{code}
 
 Therein lies the secret to restricting \lstinline!liftServerIO! to the
-server: the only function capable of turning a \lstinline!Useless! value into
+server: the only function capable of turning a \lstinline!Remote! value into
 a useful one lives in the server monad. Any client side code is thus free to
 completely ignore executing computations lifted using \lstinline!liftServerIO!;
 since the result of a server lifted computation is never observable on the
@@ -463,17 +399,16 @@ Figure \ref{lst:good-state} shows how to make proper use of server side state.
 
 \begin{listingfloat}
 \begin{code}
-main =
-  runApp config $ do
-    uselessref <- liftServerIO $ newIORef 0
+main = do
+  remoteref <- liftServerIO $ newIORef 0
 
-    count <- export $ do
-      r <- mkUseful uselessref
-      liftIO $ atomicModifyIORef r (\v -> (v+1, v+1))
+  count <- export $ do
+    r <- fromRemote remoteref
+    liftIO $ atomicModifyIORef r (\v -> (v+1, v+1))
 
-    runClient $ do
-      visitors <- onServer count
-      alert ("Your are visitor #" ++ show visitors)
+  runClient $ do
+    visitors <- onServer count
+    alert ("Your are visitor #" ++ show visitors)
 \end{code}
 \caption{server side state: doing it properly}
 \label{lst:good-state}
@@ -512,9 +447,9 @@ an identifier used by Haste.App to identify user sessions, and an
 written as they arrive. Next, we define our handshake RPC function.
 
 \begin{code}
-srvHello :: Useless RcptList -> Server ()
-srvHello uRcpts = do
-  recipients <- mkUseful uRcpts
+srvHello :: Remote RcptList -> Server ()
+srvHello remoteRcpts = do
+  recipients <- fromRemote remoteRcpts
   sid <- getSessionID
   liftIO $ do
     rcptMVar <- CC.newEmptyMVar
@@ -528,9 +463,9 @@ recipient list. Notice how the application's server state is passed in as the
 function's argument.
 
 \begin{code}
-srvSend :: Useless RcptList -> String -> Server ()
-srvSend uRcpts message = do
-    rcpts <- mkUseful uRcpts
+srvSend :: Remote RcptList -> String -> Server ()
+srvSend remoteRcpts message = do
+    rcpts <- fromRemote remoteRcpts
     liftIO $ do
       recipients <- CC.readMVar rcpts
       mapM_ (CC.forkIO . deliver message) recipients
@@ -546,9 +481,9 @@ recipients to wait for the slowest one, so we spawn a new lightweight thread
 to handle delivery for each recipient.
 
 \begin{code}
-srvAwait :: Useless RcptList -> Server String
-srvAwait uRcpts = do
-  rcpts <- mkUseful uRcpts
+srvAwait :: Remote RcptList -> Server String
+srvAwait remoteRcpts = do
+  rcpts <- fromRemote remoteRcpts
   sid <- getSessionID
   liftIO $ do
     recipients <- CC.readMVar rcpts
@@ -578,8 +513,8 @@ ensuring that any future enhancements to our chatbox program are made safely,
 in one place, instead of being spread about throughout two disjoint code bases.
 
 \begin{code}
-clientMain :: App Done
-clientMain = do
+main :: App Done
+main = do
   recipients <- liftServerIO $ CC.newMVar []
 
   hello <- export $ srvHello recipients
@@ -635,18 +570,10 @@ the \lstinline!awaitMsg! function blocks until a message arrives,
 
 This is the final part of our program; we set up an event handler to clear the
 input box and send its contents off to the server whenever the user hits return
-(character code 13) while the input box has focus. Finally, all that is left
-is to launch our application.
-
-\begin{code}
-main :: IO ()
-main =
-  runApp (mkConfig "ws://localhost:1111" 1111)
-         clientMain
-\end{code}
+(character code 13) while the input box has focus.
 
 The discerning reader may be slightly annoyed at the need to extract the
-contents from \lstinline!Useless! values at each point of use. Indeed, in a
+contents from \lstinline!Remote! values at each point of use. Indeed, in a
 simple example such as this, the source clutter caused by this becomes a
 disproportionate irritant. Fortunately, most web applications tend to have
 more complex client-server interactions, reducing this overhead significantly.
@@ -659,7 +586,7 @@ A complete listing of the core functions in Haste.App is given in table
 runApp       :: AppCfg -> App Done -> IO ()
 
 runClient    :: Client () -> App Done
-liftServerIO :: IO a -> App (Useless a)
+liftServerIO :: IO a -> App (Remote a)
 export       :: Exportable a
              => a -> App (Export a)
 
@@ -667,7 +594,7 @@ onServer     :: Export (Server a) -> Client a
 (<.>)        :: Serialize a
              => Export (a -> b) -> a -> Export b
 
-mkUseful     :: Useless a -> Server a
+fromRemote   :: Remote a -> Server a
 getSessionID :: Server SessionID
 \end{code}
 \caption{Types of the Haste.App core functions}
@@ -695,8 +622,8 @@ wait for its completion. The result of the remote computation is returned on
 the client after it completes.} \\
 \lstinline!<.>! & \parbox[t]{5cm}{Apply an \lstinline!export!ed function to
 a serializable argument.} \\
-\lstinline!mkUseful! & \parbox[t]{5cm}{Extract the contents of a
-\lstinline!Useless! value produced by \lstinline!liftServerIO! on the server.} \\
+\lstinline!fromRemote! & \parbox[t]{5cm}{Extract the contents of a
+\lstinline!Remote! value produced by \lstinline!liftServerIO! on the server.} \\
 \lstinline!getSessionID! & \parbox[t]{5cm}{Get the unique identifier for
 the current session. This is a pure convenience function, to relieve
 programmers of the burden of session bookkeeping.} \\
@@ -777,17 +704,17 @@ operations, both of which have slightly different implementations on the client
 and server respectively.
 
 \begin{code}
-data Useless a = Useful a | Useless
+data Remote a = Here a | There
 data Export a = Export CallID [JSON]
 
-liftServerIO :: IO a -> App (Useless a)
+liftServerIO :: IO a -> App (Remote a)
 export :: Exportable a => a -> App (Export a)
 \end{code}
 
 The client side definition of \lstinline!liftServerIO! is as simple as can be.
 
 \begin{code}
-liftServerIO _ = App $ return Useless
+liftServerIO _ = App $ return There
 \end{code}
 
 Its argument is simply ignored, and an opaque dummy value is returned; recall
@@ -795,17 +722,17 @@ that server-lifted IO computations are not observable on the client. The
 server side implementation is only marginally more complex.
 
 \begin{code}
-liftServerIO m = App $ fmap Useful m
+liftServerIO m = App $ fmap Here m
 \end{code}
 
 Its argument IO computation is executed, and the result is wrapped in the
-\lstinline!Useful! constructor. The counterpart function, \lstinline!mkUseful!
-simply unwraps the \lstinline!Useful! constructor and returns the contained
+\lstinline!Remote! constructor. The counterpart function, \lstinline!fromRemote!
+simply unwraps the \lstinline!Here! constructor and returns the contained
 value in the \lstinline!Server! monad.
 
 \begin{code}
-mkUseful :: Useless a -> Server a
-mkUseful (Useful x) = return x
+fromRemote :: Remote a -> Server a
+fromRemote (Here x) = return x
 \end{code}
 
 \lstinline!export! is a more interesting function. Looking at its type, we see
@@ -1350,67 +1277,6 @@ immutability of Haskell, this model gives programmers a not-so-subtle hint
 as to how they may want to structure their programs. Extending our existing
 model with an \lstinline!onClient! counterpart to \lstinline!onServer! would be
 a simple task, but we are not quite convinced that there is value in doing so.
-
-\paragraph{Preventing divergence} While our solution is completely safe from
-the invocation point of the \lstinline!runApp! function onward, capturing
-IO-dependent variables introduced before this invocation may lead to the client
-and server execution paths diverging. Recall that our solution does not modify
-either of the compilers used. As such, both will produce code to execute all
-computations called by \lstinline!main!. Consider the following example:
-
-\begin{code}
-main = do
-  exportTwo <- randomRIO (False, True)
-
-  runApp config $ do
-    when exportTwo $ do
-      _ <- export (return () :: Server ())
-      return ()
-    fun <- export $ return "I'm a little teapot"
-
-    runClient $ do
-      onServer fun >>= alert
-\end{code}
-
-Whenever \lstinline!exportTwo! gets assigned a \lstinline!True! value, this
-application will call \lstinline!export! twice, assigning the identifier
-\lstinline!0! to the first exported computation, which is discarded, and
-\lstinline!1! to the second, \lstinline!fun!, which is kept and invoked.
-If, on the other hand, \lstinline!exportTwo! is \lstinline!False!,
-only the second computation will be exported, and will thus be assigned the
-identifier \lstinline!1!.
-
-This is perfectly fine as long as the client and server both assign the
-same identifier to \lstinline!fun!. However, since \lstinline!randomRIO! is
-not deterministic and since all computations called by \lstinline!main! will be
-executed on both the client and the server, there is a possibility that
-\lstinline!fun! will be assigned the identifier \lstinline!0! on the client and
-\lstinline!1! on the server. In this scenario, when the client attempts to call
-the \lstinline!return "I'm a little teapot"! computation over the network,
-the server instead executes the \lstinline!return ()! computation, which
-returns \lstinline!()! rather than \lstinline!String!, breaking the type safety
-of our program!
-
-This is easily remedied however, by a slight compiler modification. Instead of
-using \lstinline!main :: IO ()! as the program entry point, we introduce a
-function \lstinline!clientMain :: App Done! for this purpose, and let the runtime
-system start the application by invoking \lstinline!runApp config clientMain!,
-where \lstinline!config! contains the URL and port configuration for the
-server, given by the programmer using a compiler flag.
-
-As this modification only affects the program's entry, point which is already
-given ``special'' treatment in Haskell compilers, and may even be implemented
-using the plugin mechanism of GHC, requiring no modification of the compiler
-itself, we believe this to be a practical, non-intrusive way to remove this
-limitation.
-
-The astute reader may notice that the same applies to code using
-\lstinline!unsafePerformIO! to declare IO-dependent top-level values, and that
-this problem is unaffected by changing the type of the program's entry point.
-While this is indeed true, we feel that since it is quite possible to break
-any Haskell program using \lstinline!unsafePerformIO!, even subverting the type
-system, ``solving'' \lstinline!unsafePerformIO! is not within the scope of this
-work.
 
 \paragraph{Environment consistency} As our programming model uses two different
 compilers to generate client and server code, it is crucial to keep the package
