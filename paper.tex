@@ -53,7 +53,7 @@
                                   % (paid open-access papers, 
                                   % short abstracts)
 
-\titlebanner{-- ICFP '14 draft submission --}        % These are ignored unless
+\titlebanner{-- Haskell Symposium '14 draft submission --}        % These are ignored unless
 \preprintfooter{-- -- -- -- draft -- -- -- --}   % 'preprint' option specified.
 
 \title{A seamless, client-centric programming model for type safe web applications}
@@ -285,7 +285,7 @@ function and call it from the client.
 \begin{code}
 main :: App Done
 main = do
-  greetings <- export helloServer
+  greetings <- remote helloServer
 
   runClient $ do
     name <- prompt "Hi there, what is your name?"
@@ -298,18 +298,18 @@ the server and begin in the \lstinline!IO! monad, Haste.App applications live
 on both and begin execution in the \lstinline!App! monad which provides some
 crucial tools to facilitate typed communication between the two.
 
-The \lstinline!export! function takes an arbitrary function, provided that all
+The \lstinline!remote! function takes an arbitrary function, provided that all
 its arguments as well as its return value are serializable through the
 \lstinline!Serialize! type class, and produces a typed identifier which
-may be used to refer to the exported function. In this example, the type of
-\lstinline!greetings! is \lstinline!Export (String -> Server ())!,
+may be used to refer to the remote function. In this example, the type of
+\lstinline!greetings! is \lstinline!Remote (String -> Server ())!,
 indicating that the identifier refers
-to an exported function with a single \lstinline!String! argument and no return
-value. Exported functions all live in the \lstinline!Server! monad.
+to a remote function with a single \lstinline!String! argument and no return
+value. Remote functions all live in the \lstinline!Server! monad.
 This part of the program is executed on both the server and the client, albeit
 with slightly different side effects, as described in section \ref{sec:impl}.
 
-After the \lstinline!export! call, we enter the domain of client-exclusive code
+After the \lstinline!remote! call, we enter the domain of client-exclusive code
 with the application of \lstinline!runClient!. This function executes
 computations in the \lstinline!Client! monad which is essentially an
 IO monad with cooperative multitasking added on top, to mitigate the fact that
@@ -319,24 +319,24 @@ which ensures that each \lstinline!App! computation contains exactly one client
 computation.
 
 In order to make an RPC call using an identifier obtained from
-\lstinline!export!, we must supply it with an argument. This is done using the
+\lstinline!remote!, we must supply it with an argument. This is done using the
 \lstinline!<.>! operator. It might be interesting to note that its type,
 \linebreak
-\lstinline!Serialize a => Export (a -> b) -> a -> Export b!,
+\lstinline!Serialize a => Remote (a -> b) -> a -> Remote b!,
 is very similar to the type of the \lstinline!<*>! operator over applicative
 functors. This is not a coincidence; \lstinline!<.>! performs the same role
-for the \lstinline!Export! type as \lstinline!<*>! performs for applicative
+for the \lstinline!Remote! type as \lstinline!<*>! performs for applicative
 functors. The reason for using a separate operator for this instead of making
-\lstinline!Export! an instance of \lstinline!Applicative! is that since
-functions embedded in the \lstinline!Export! type exist only to be called over
+\lstinline!Remote! an instance of \lstinline!Applicative! is that since
+functions embedded in the \lstinline!Remote! type exist only to be called over
 a network, such functions must only be applied to arguments which can be
-serialized and sent over a network connection. When an \lstinline!Export!
+serialized and sent over a network connection. When a \lstinline!Remote!
 function is applied to an argument using \lstinline!<.>!, the argument is
-serialized and stored inside the resulting \lstinline!Export! object, awaiting
-dispatch. \lstinline!Export! values can thus be seen as explicit
+serialized and stored inside the resulting \lstinline!Remote! object, awaiting
+dispatch. \lstinline!Remote! computations can thus be seen as explicit
 representations of closures.
 
-After applying the value obtained from the user to the exported function,
+After applying the value obtained from the user to the remote function,
 we apply the \lstinline!onServer! function to the result, which dispatches
 the RPC call to the server. \lstinline!onServer! will then block until the
 RPC call returns.
@@ -353,7 +353,7 @@ helloServer name =
 
 main :: App Done
 main = do
-  greetings <- export helloServer
+  greetings <- remote helloServer
 
   runClient $ do
     name <- prompt "Hi there, what is your name?"
@@ -362,6 +362,30 @@ main = do
 \caption{A seamless programming model: Hello Server}
 \label{lst:hello-server}
 \end{listingfloat}
+
+To run this example, an address and a port must be provided so that the client
+knows which server to contact. There are several ways of doing this:
+using the GHC plugin system, through Template Haskell or by slightly altering
+how program entry points are treated in a compiler or wrapper script, to name
+a few. A non-intrusive method when using the GHC/Haste compiler pair would
+be to pass add \lstinline!-main-is setup! to both compilers' command line
+and add the \lstinline!setup! function in figure \ref{lst:setup} to the source
+code. This will instruct the server binary to listen on the port 1111 when
+started, and the client to attempt contact with that port on the local machine.
+
+The exact mechanism chosen to provide the host and port are implementation
+specific, and will in the interest of clarity not be discussed further.
+
+\begin{listingfloat}
+\begin{code}
+setup :: IO ()
+setup =
+  runApp (mkConfig "ws://localhost:1111" 1111) main
+\end{code}
+\caption{Bootstrapping a Haste.App program}
+\label{lst:setup}
+\end{listingfloat}
+
 
 \subsection{Using server side state}
 
@@ -386,7 +410,7 @@ value is needs to be extracted somehow, something which is only possible using
 a single function:
 
 \begin{code}
-fromRemote :: Remote a -> Server a
+use :: Remote a -> Server a
 \end{code}
 
 Therein lies the secret to restricting \lstinline!liftServerIO! to the
@@ -402,8 +426,8 @@ Figure \ref{lst:good-state} shows how to make proper use of server side state.
 main = do
   remoteref <- liftServerIO $ newIORef 0
 
-  count <- export $ do
-    r <- fromRemote remoteref
+  count <- remote $ do
+    r <- use remoteref
     liftIO $ atomicModifyIORef r (\v -> (v+1, v+1))
 
   runClient $ do
@@ -449,7 +473,7 @@ written as they arrive. Next, we define our handshake RPC function.
 \begin{code}
 srvHello :: Remote RcptList -> Server ()
 srvHello remoteRcpts = do
-  recipients <- fromRemote remoteRcpts
+  recipients <- use remoteRcpts
   sid <- getSessionID
   liftIO $ do
     rcptMVar <- CC.newEmptyMVar
@@ -465,7 +489,7 @@ function's argument.
 \begin{code}
 srvSend :: Remote RcptList -> String -> Server ()
 srvSend remoteRcpts message = do
-    rcpts <- fromRemote remoteRcpts
+    rcpts <- use remoteRcpts
     liftIO $ do
       recipients <- CC.readMVar rcpts
       mapM_ (CC.forkIO . deliver message) recipients
@@ -483,7 +507,7 @@ to handle delivery for each recipient.
 \begin{code}
 srvAwait :: Remote RcptList -> Server String
 srvAwait remoteRcpts = do
-  rcpts <- fromRemote remoteRcpts
+  rcpts <- use remoteRcpts
   sid <- getSessionID
   liftIO $ do
     recipients <- CC.readMVar rcpts
@@ -507,7 +531,7 @@ is thrown to the client.
 
 Having implemented our three server operations, all that's left is to tie them
 to the client. In this tying, we see our main advantage over the JavaScript
-version in section \ref{sec:jsexample} in action: the \lstinline!export!
+version in section \ref{sec:jsexample} in action: the \lstinline!remote!
 function builds a strongly typed bridge between the client and the server,
 ensuring that any future enhancements to our chatbox program are made safely,
 in one place, instead of being spread about throughout two disjoint code bases.
@@ -517,9 +541,9 @@ main :: App Done
 main = do
   recipients <- liftServerIO $ CC.newMVar []
 
-  hello <- export $ srvHello recipients
-  awaitMsg <- export $ srvAwait recipients
-  sendMsg <- export $ srvSend recipients
+  hello <- remote $ srvHello recipients
+  awaitMsg <- remote $ srvAwait recipients
+  sendMsg <- remote $ srvSend recipients
 
   runClient $ do
     withElems ["log","message"] $ \[log,msgbox] -> do
@@ -527,7 +551,7 @@ main = do
 \end{code}
 
 Notice that the \lstinline!recipients! list is passed to our three server
-operations \emph{before} they are exported; since \lstinline!recipients! is
+operations \emph{before} they are imported; since \lstinline!recipients! is
 a mutable reference created on the server and inaccessible to client code,
 it is not possible to pass it over the network as an RPC argument.
 Even if it were possible, passing server-private state back and forth over the
@@ -542,7 +566,7 @@ identified by ``message''. These are the same DOM nodes that were referenced in
 our original example, and refer to the chat log window and the text input
 field respectively. After locating all the needed UI elements, the client
 proceeds to register itself with the server's recipient list using the
-\lstinline!hello! export.
+\lstinline!hello! remote computation.
 
 \begin{code}
       let recvLoop chatlines = do
@@ -586,15 +610,15 @@ A complete listing of the core functions in Haste.App is given in table
 runApp       :: AppCfg -> App Done -> IO ()
 
 runClient    :: Client () -> App Done
-liftServerIO :: IO a -> App (Remote a)
-export       :: Exportable a
-             => a -> App (Export a)
+liftServerIO :: IO a -> App (RemoteValue a)
+remote       :: Remotable a
+             => a -> App (Remote a)
 
-onServer     :: Export (Server a) -> Client a
+onServer     :: Remote (Server a) -> Client a
 (<.>)        :: Serialize a
-             => Export (a -> b) -> a -> Export b
+             => Remote (a -> b) -> a -> Remote b
 
-fromRemote   :: Remote a -> Server a
+use          :: RemoteValue a -> Server a
 getSessionID :: Server SessionID
 \end{code}
 \caption{Types of the Haste.App core functions}
@@ -615,15 +639,15 @@ an \lstinline!App! computation, which is enforced by the type system.} \\
 \lstinline!liftServerIO! & \parbox[t]{5cm}{Lift an IO computation into the
 \lstinline!App! monad. The computation and its result are exclusive to the
 server, as enforced by the type system, and are not observable on the client.} \\
-\lstinline!export! & \parbox[t]{5cm}{Make a server side function available to
+\lstinline!remote! & \parbox[t]{5cm}{Make a server side function available to
 be called remotely by the client.} \\
 \lstinline!onServer! & \parbox[t]{5cm}{Dispatch a remote call to the server and
 wait for its completion. The result of the remote computation is returned on
 the client after it completes.} \\
-\lstinline!<.>! & \parbox[t]{5cm}{Apply an \lstinline!export!ed function to
+\lstinline!<.>! & \parbox[t]{5cm}{Apply an \lstinline!remote! function to
 a serializable argument.} \\
-\lstinline!fromRemote! & \parbox[t]{5cm}{Extract the contents of a
-\lstinline!Remote! value produced by \lstinline!liftServerIO! on the server.} \\
+\lstinline!use! & \parbox[t]{5cm}{Extract the contents of a
+\lstinline!RemoteValue! produced by \lstinline!liftServerIO! on the server.} \\
 \lstinline!getSessionID! & \parbox[t]{5cm}{Get the unique identifier for
 the current session. This is a pure convenience function, to relieve
 programmers of the burden of session bookkeeping.} \\
@@ -681,8 +705,8 @@ newtype App a = App (StateT AppState IO a)
 As we can see, \lstinline!App! is a simple state monad, with underlying IO
 capabilities to allow server side computations to be forked from within it.
 Its \lstinline!CallID! state element contains the identifier to be given to the
-next exported function, and its other state element contains a mapping from
-identifiers to exported functions.
+next remote function, and its other state element contains a mapping from
+identifiers to remote functions.
 
 What makes \lstinline!App! interesting is that computations in this monad are
 executed on both the client and the server; once on server startup, and once
@@ -704,11 +728,11 @@ operations, both of which have slightly different implementations on the client
 and server respectively.
 
 \begin{code}
-data Remote a = Here a | There
-data Export a = Export CallID [JSON]
+data RemoteValue a = Here a | There
+data Remote a = Remote CallID [JSON]
 
-liftServerIO :: IO a -> App (Remote a)
-export :: Exportable a => a -> App (Export a)
+liftServerIO :: IO a -> App (RemoteValue a)
+remote :: Remotable a => a -> App (Remote a)
 \end{code}
 
 The client side definition of \lstinline!liftServerIO! is as simple as can be.
@@ -726,49 +750,49 @@ liftServerIO m = App $ fmap Here m
 \end{code}
 
 Its argument IO computation is executed, and the result is wrapped in the
-\lstinline!Remote! constructor. The counterpart function, \lstinline!fromRemote!
+\lstinline!Remote! constructor. The counterpart function, \lstinline!use!
 simply unwraps the \lstinline!Here! constructor and returns the contained
 value in the \lstinline!Server! monad.
 
 \begin{code}
-fromRemote :: Remote a -> Server a
-fromRemote (Here x) = return x
+use :: Remote a -> Server a
+use (Here x) = return x
 \end{code}
 
-\lstinline!export! is a more interesting function. Looking at its type, we see
-that it accepts any \lstinline!Exportable! value for its argument.
-\lstinline!Exportable! is defined as follows.
+\lstinline!remote! is a more interesting function. Looking at its type, we see
+that it accepts any \lstinline!Remotable! value for its argument.
+\lstinline!Remotable! is defined as follows.
 
 \begin{code}
-class Exportable a where
-  mkExported :: a -> ([JSON] -> Server JSON)
+class Remotable a where
+  mkRemote :: a -> ([JSON] -> Server JSON)
 
-instance Serialize a => Exportable (Server a) where
-  mkExported m = fmap toJSON m
+instance Serialize a => Remotable (Server a) where
+  mkRemote m = fmap toJSON m
 
-instance (Serialize a, Exportable b) =>
-         Exportable (a -> b) where
-  mkExported f =
-    \(x:xs) -> mkExported (f $ fromJSON x) xs
+instance (Serialize a, Remotable b) =>
+         Remotable (a -> b) where
+  mkRemote f =
+    \(x:xs) -> mkRemote (f $ fromJSON x) xs
 \end{code}
 
 In essence, any function, over any number of arguments, which returns a
-serializable value in the \lstinline!Server! monad can be exported. The
-\lstinline!mkExported! function makes use of a well-known type class trick for
+serializable value in the \lstinline!Server! monad can be imported. The
+\lstinline!mkRemote! function makes use of a well-known type class trick for
 creating statically typed variadic functions, and works very much like the
 \lstinline!printf! function of Haskell's standard library.\ \cite{printf}
 
-The client implementation of \lstinline!export! is not very complex.
+The client implementation of \lstinline!remote! is not very complex.
 
 \begin{code}
-export _ = App $ do
-  (next_id, exports) <- get
-  put (next_id+1, exports)
-  return (Export next_id [])
+remote _ = App $ do
+  (next_id, remotes) <- get
+  put (next_id+1, remotes)
+  return (Remote next_id [])
 \end{code}
 
-As the exported function lives on the server, the client only needs an
-identifier to be able to call on it. The exported function is thus ignored,
+As the remote function lives on the server, the client only needs an
+identifier to be able to call on it. The remote function is thus ignored,
 so that it can be optimized out of existence in the client version of the code.
 The server version is only marginally more complex in that it updates the
 identifier-function mapping table as well.
@@ -780,21 +804,21 @@ Cloud Haskell\ \cite{cloudhaskell}, which is discussed further in section
 \ref{sec:cloudhaskell}.
 
 \begin{code}
-export f = App $ do
-  (next_id, exports) <- get
-  put (next_id+1, (next_id, mkExported f) : exports)
-  return (Export next_id [])
+remote f = App $ do
+  (next_id, remotes) <- get
+  put (next_id+1, (next_id, mkRemote f) : remotes)
+  return (Remote next_id [])
 \end{code}
 
-The second argument of the \lstinline!Export! constructor is the list of
-arguments to be sent to the export, to be updated as the exported function is
+The second argument of the \lstinline!Remote! constructor is the list of
+arguments to be sent to the function, to be updated as the remote function is
 applied using the \lstinline!<.>! operator.
 
 \begin{code}
 (<.>) :: Serialize a
-      => Export (a -> b) -> a -> Export b
-(Export identifier args) <.> arg =
-  Export identifier (toJSON arg : args)
+      => Remote (a -> b) -> a -> Remote b
+(Remote identifier args) <.> arg =
+  Remote identifier (toJSON arg : args)
 \end{code}
 
 After the \lstinline!App! computation finishes, the identifier-function mapping
@@ -847,8 +871,8 @@ only has a single particularly interesting operation: \lstinline!onServer!.
 
 \begin{code}
 onServer :: Serialize a
-         => Export (Server a) -> Client a
-onServer (Export identifier args) = do
+         => Remote (Server a) -> Client a
+onServer (Remote identifier args) = do
   nonce <- get
   put (nonce + 1)
   mv <- createResultMVar nonce
@@ -1041,7 +1065,7 @@ arbitrary strings at run time using the \lstinline!eval! function, coupled with
 the fact that functions in Haste and in JavaScript share the same
 representation, to dynamically create a function object at runtime.
 The \lstinline!ffi! function is typed using the same method as the
-\lstinline!mkExported! function described in section \ref{sec:impl}.
+\lstinline!mkRemote! function described in section \ref{sec:impl}.
 When applied to one or more arguments instantiating the \lstinline!Marshal!
 type class, the \lstinline!pack! function is applied to each argument,
 marshalling them into their respective JavaScript representations, before they
@@ -1068,8 +1092,8 @@ needed.
 \subsection{Related work}
 \label{sec:related}
 
-Several other approaches to the seamless client-server interaction exist. In
-general, these attacks tend to be of the ``all or nothing'' variety,
+Several other approaches to seamless client-server interaction exist. In
+general, these proposed solutions tend to be of the ``all or nothing'' variety,
 introducing new languages or otherwise requiring custom full stack solutions.
 In contrast, our solution can be implemented entirely as a library and is
 portable to any pair of compilers supporting typed monadic programming.
@@ -1221,17 +1245,17 @@ modifying our implementation to use GHCJS or even the JavaScript backend of UHC
 would be trivial. This implementation not only allows for greater flexibility,
 but also eliminates the need to tangle with complex compiler internals.
 
-\paragraph{Inspiration and alternatives to \lstinline!export!}
+\paragraph{Inspiration and alternatives to \lstinline!remote!}
 \label{sec:cloudhaskell}
 One crucial aspect of implementing cross-network function calls is the issue of
 data representation: the client side of things must be able to obtain some
 representation of any function it may want to call on the server.
 
-In our solution, this representation is obtained through the use of the \lstinline!export! function, which when executed on the server pairs a function with a
+In our solution, this representation is obtained through the use of the \lstinline!remote! function, which when executed on the server pairs a function with a
 unique identifier and on the client, and when executed on the client returns
 said identifier so that the client may now refer to the function. While this
 has the advantage of being simple to implement, one major drawback of this
-method is that all functions must be explicitly exported in the \lstinline!App!
+method is that all functions must be explicitly imported in the \lstinline!App!
 monad prior to being called over the network.
 
 This approach was inspired by Cloud Haskell\ \cite{cloudhaskell}, which
@@ -1243,8 +1267,8 @@ wherein a remote table, pairing values with unique identifiers, is kept.
 This explicit bookkeeping relies on the programmer to assign appropriate types
 to both values themselves and their identifiers, breaking type safety.
 
-The astute reader may notice that this is exactly what the \lstinline!export!
-function does as well, the difference being that \lstinline!export! links the
+The astute reader may notice that this is exactly what the \lstinline!remote!
+function does as well, the difference being that \lstinline!remote! links the
 identifier to the value it represents on the type level, making it impossible
 to call non-existent remote functions and break the program's type safety in
 other ways.
