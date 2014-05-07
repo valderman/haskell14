@@ -58,9 +58,9 @@
 
 \title{A seamless, client-centric programming model for type safe web applications}
 
-\authorinfo{Koen Claessen and Anton Ekblad}
+\authorinfo{Anton Ekblad and Koen Claessen}
            {Chalmers University of Technology}
-           {\{koen,antonek\}@chalmers.se}
+           {\{antonek,koen\}@chalmers.se}
 
 \maketitle
 
@@ -104,26 +104,26 @@ applications are conceptually single entities, making this forced split an
 undesirable hindrance which introduces new possibilities for defects, adds
 development overhead and prevents code reuse.
 
-Several attempts have been made at tackling this problem, but none is, in our
-view, satisfactory. In this paper, we propose a functional programming model in
-which a web application is written as a single program from which client and
-server binaries are generated during compilation. Type annotations in the source
-program control which parts are executed on the server and which are executed
-on the client, and the two communicate using type safe RPC calls. Functions
-which are not explicitly declared as server side or client side are usable by
-either side.
+Several solutions to this problem have been proposed, as discussed in section
+\ref{sec:related}, but the perfect one has yet to be found. In this paper,
+we propose a functional programming model in which a web application is
+written as a single program from which client and server executables are
+generated during compilation. Type annotations in the source program control
+which parts are executed on the server and which are executed on the client,
+and the two communicate using type safe RPC calls. Functions which are not
+explicitly declared as server side or client side are usable by either side.
 
 Recent advances in compiler technology from functional languages to JavaScript
-have led to a wealth of compilers targeting the web space, and enabled the
+have led to a wealth of compilers targeting the web space, and have enabled the
 practical development of functional libraries and applications for
 the browser. This enables us to implement our solution as a simple Haskell
 library for any compiler capable of producing JavaScript output, requiring no
 further modification to existing compilers.
 
-As our implementation targets the Haste Haskell to JavaScript compiler, this
-paper also goes into some detail about its design and implementation as well
-as the alternatives available for compiling functional languages to a browser
-environment.
+As our implementation targets the Haste Haskell to JavaScript
+compiler\ \cite{haste}, this paper also goes into some detail about its design
+and implementation as well as the alternatives available for compiling
+functional languages to a browser environment.
 
 \paragraph{Motivation}
 
@@ -160,7 +160,7 @@ function chat(sock, msg) {sock.send('text' + msg);}
 window.onload = function() {
   var logbox = document.getElementById('log');
   var msgbox = document.getElementById('message');
-  var sock = new WebSocket('ws://example.com);
+  var sock = new WebSocket('ws://example.com');
 
   sock.onmessage = function(e) {
     logbox.value = e.data + NEWLINE + logbox.value;
@@ -1139,6 +1139,7 @@ needed.
 \section{Discussion and related work}
 
 \subsection{Related work}
+\label{sec:related}
 
 Several other approaches to the seamless client-server interaction exist. In
 general, these attacks tend to be of the ``all or nothing'' variety,
