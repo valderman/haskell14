@@ -395,27 +395,16 @@ nowhere else. This is accomplished using a more restricted version of
 \lstinline!liftIO!:
 
 \begin{code}
-liftServerIO :: IO a -> App (RemoteValue a)
+liftServerIO :: IO a -> App (Server a)
 \end{code}
 
 In contrast to \lstinline!liftIO!, the result value of \lstinline!liftServerIO!
-is wrapped in the abstract \lstinline!RemoteValue! type. As the name implies,
-values of this type live exclusively on the server. In order to inspect such a
-value is needs to be extracted somehow, something which is only possible using
-a single function:
-
-\begin{code}
-use :: RemoteValue a -> Server a
-\end{code}
-
-Therein lies the secret to restricting \lstinline!liftServerIO! to the
-server: the only function capable of turning a \lstinline!RemoteValue! into
-one that can be inspected lives in the server monad. Any client side code is
-thus free to completely ignore executing computations lifted using
-\lstinline!liftServerIO!; since the result of a server lifted computation is
-never observable on the client, the client has no obligation to even produce
-such a value. Figure \ref{lst:good-state} shows how to make proper use of
-server side state.
+is contained within the \lstinline!Server! monad, completely out of reach of the
+client. Any client side code is thus free to completely ignore executing
+computations lifted using \lstinline!liftServerIO!; since the result of a
+server lifted computation is never observable on the client, the client has no
+obligation to even produce such a value. Figure \ref{lst:good-state} shows how
+to make proper use of server side state.
 
 \begin{listingfloat}
 \begin{code}
@@ -423,7 +412,7 @@ main = do
   remoteref <- liftServerIO $ newIORef 0
 
   count <- remote $ do
-    r <- use remoteref
+    r <- remoteref
     liftIO $ atomicModifyIORef r (\v -> (v+1, v+1))
 
   runClient $ do
@@ -467,9 +456,9 @@ an identifier used by Haste.App to identify user sessions, and an
 written as they arrive. Next, we define our handshake RPC function.
 
 \begin{code}
-srvHello :: Remote RcptList -> Server ()
+srvHello :: Server RcptList -> Server ()
 srvHello remoteRcpts = do
-  recipients <- use remoteRcpts
+  recipients <- remoteRcpts
   sid <- getSessionID
   liftIO $ do
     rcptMVar <- CC.newEmptyMVar
@@ -483,9 +472,9 @@ recipient list. Notice how the application's server state is passed in as the
 function's argument.
 
 \begin{code}
-srvSend :: Remote RcptList -> String -> Server ()
+srvSend :: Server RcptList -> String -> Server ()
 srvSend remoteRcpts message = do
-    rcpts <- use remoteRcpts
+    rcpts <- remoteRcpts
     liftIO $ do
       recipients <- CC.readMVar rcpts
       mapM_ (CC.forkIO . deliver message) recipients
@@ -501,9 +490,9 @@ recipients to wait for the slowest one, so we spawn a new lightweight thread
 to handle delivery for each recipient.
 
 \begin{code}
-srvAwait :: Remote RcptList -> Server String
+srvAwait :: Server RcptList -> Server String
 srvAwait remoteRcpts = do
-  rcpts <- use remoteRcpts
+  rcpts <- remoteRcpts
   sid <- getSessionID
   liftIO $ do
     recipients <- CC.readMVar rcpts
@@ -614,7 +603,6 @@ onServer     :: Remote (Server a) -> Client a
 (<.>)        :: Serialize a
              => Remote (a -> b) -> a -> Remote b
 
-use          :: RemoteValue a -> Server a
 getSessionID :: Server SessionID
 \end{code}
 \caption{Types of the Haste.App core functions}
@@ -806,28 +794,22 @@ The server side representation of the \lstinline!RemoteValue! and
 counterparts.
 
 \begin{code}
-data RemoteValue a = Here a
 data Remote a = Remote
 \end{code}
 
 Where the client is able to do something useful with the \lstinline!Remote!
-type but not with \lstinline!RemoteValue! the server has no way to inspect
-\lstinline!Remote! functions, and thus only has a no-op implementation of the
-\lstinline!<.>! operator. On the other hand, the server has full access to the
-contents of \lstinline!RemoteValue!s via the \lstinline!use! function.
+type, the server has no way to inspect \lstinline!Remote! functions, and thus
+only has a no-op implementation of the \lstinline!<.>! operator. On the other
+hand, it does have full access to the values and side effects produced by
+the \lstinline!liftServerIO! function, which is quite simple. The side effect
+is performed immediately and its result saved for later, as state holding
+elements should only be initialized once.
 
 \begin{code}
-use :: RemoteValue a -> Server a
-use (Here x) = return x
-\end{code}
-
-Those values are produced by the \lstinline!remoteIO! function, which is quite
-simple. It merely executes its argument and wraps its argument in the
-\lstinline!RemoteValue! type.
-
-\begin{code}
-remoteIO :: IO a -> Server (RemoteValue a)
-remoteIO m = App $ fmap Here m
+liftServerIO :: IO a -> App (Server a)
+liftServerIO m = App $ do
+  x <- liftIO m
+  return (return x)
 \end{code}
 
 The server version of \lstinline!remote! is a little more complex than its
