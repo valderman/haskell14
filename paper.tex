@@ -69,7 +69,7 @@ We propose a new programming model for web applications which is (1)
 seamless; one program and one language is used to produce code for
 both client and server, (2) client-centric; the programmer takes the
 viewpoint of the client that runs code on the server rather than the
-other way around, (3) functional and type-safe; and (4) portable;
+other way around, (3) functional and type-safe, and (4) portable;
 everything is implemented as a Haskell library that implicitly takes
 care of all networking code. Our aim is to improve the painful and
 error-prone experience of today's standard development methods,
@@ -149,7 +149,11 @@ For a more concrete example, let's say that we want to implement a simple
 ``chatbox'' component for a website, to allow visitors to discuss the site's
 content in real time. Using mainstream development practices and recent
 technologies such as WebSockets\ \cite{websockets}, we may come up with
-something like the program in figure \ref{lst:javascript-client}.
+something like the program in figure \ref{lst:javascript-client} for our
+client program. In addition, a corresponding server program would need to be
+written to handle distribution of messages among clients. We will not give such
+an implementation here, as we do not believe it necessary to state the problem
+at hand.
 
 \label{sec:jsexample}
 \begin{listingfloat}
@@ -370,8 +374,6 @@ how program entry points are treated in a compiler or wrapper script, to name
 a few. A non-intrusive method when using the GHC/Haste compiler pair would
 be to pass add \lstinline!-main-is setup! to both compilers' command line
 and add the \lstinline!setup! function to the source code.
-This will instruct the server binary to listen on the port 1111 when
-started, and the client to attempt contact with that port on the local machine.
 
 \begin{code}
 setup :: IO ()
@@ -379,6 +381,8 @@ setup =
   runApp (mkConfig "ws://localhost:1111" 1111) main
 \end{code}
 
+This will instruct the server binary to listen on the port 1111 when
+started, and the client to attempt contact with that port on the local machine.
 The exact mechanism chosen to provide the host and port are implementation
 specific, and will in the interest of clarity not be discussed further.
 
@@ -463,7 +467,7 @@ srvHello remoteRcpts = do
   liftIO $ do
     rcptMVar <- CC.newEmptyMVar
     CC.modifyMVar recipients $ \cs ->
-      return ((sid, rcptMVar):cs ,())
+      return ((sid, rcptMVar):cs, ())
 \end{code}
 
 The handshake is a simple operation; an \lstinline!MVar! is associated with the
@@ -595,7 +599,7 @@ A complete listing of the core functions in Haste.App is given in table
 runApp       :: AppCfg -> App Done -> IO ()
 
 runClient    :: Client () -> App Done
-liftServerIO :: IO a -> App (RemoteValue a)
+liftServerIO :: IO a -> App (Server a)
 remote       :: Remotable a
              => a -> App (Remote a)
 
@@ -630,8 +634,6 @@ wait for its completion. The result of the remote computation is returned on
 the client after it completes.} \\
 \lstinline!<.>! & \parbox[t]{5cm}{Apply an \lstinline!remote! function to
 a serializable argument.} \\
-\lstinline!use! & \parbox[t]{5cm}{Extract the contents of a
-\lstinline!RemoteValue! produced by \lstinline!liftServerIO! on the server.} \\
 \lstinline!getSessionID! & \parbox[t]{5cm}{Get the unique identifier for
 the current session. This is a pure convenience function, to relieve
 programmers of the burden of session bookkeeping.} \\
@@ -707,27 +709,28 @@ application's \lstinline!Client! computation whereas on the server, this
 computation is discarded, and the server instead goes into an event loop,
 waiting for calls from the client.
 
-The workings of the \lstinline!App! monad basically hinges on two abstract data
-types: \lstinline!RemoteValue! and \lstinline!Remote!. \lstinline!RemoteValue!
-is used to represent values which are available to the server but not to the
-client. \lstinline!Remote! denotes functions which live on the server but can
+The workings of the \lstinline!App! monad basically hinges on the
+\lstinline!Server! and \lstinline!Remote! abstract data types.
+\lstinline!Server! is the monad wherein any server side code is contained, and
+\lstinline!Remote! denotes functions which live on the server but can
 be invoked remotely by the client. The implementation of these types and the
 functions that operate on them differ between the client and the server.
 
 \paragraph{Client side implementations}
-We begin by looking at the client side implementation.
+We begin by looking at the client side implementation for those two types.
 
 \begin{code}
-data RemoteValue a = There
+data Server a = Server
 data Remote a = Remote CallID [JSON]
 \end{code}
 
-As values of the \lstinline!RemoteValue! type are not accessible to the client,
-they are represented by a simple dummy value. The \lstinline!Remote! type is
-slightly more useful, containing the ID of a remote function and a list of the
-serialized arguments to be passed when invoking it. In essence, the
-\lstinline!Remote! type is an explicit representation of a remote closure.
-Such closures can be applied to values using the \lstinline!<.>! operator.
+The \lstinline!Server! monad is quite uninteresting to the client; since
+operations performed within it can not be observed by the client in any way,
+such computations are simply represented by a dummy value.
+The \lstinline!Remote! type contains the identifier of a remote function and a
+list of the serialized arguments to be passed when invoking it. In essence,
+it is an explicit representation of a remote closure. Such closures can be
+applied to values using the \lstinline!<.>! operator.
 
 \begin{code}
 (<.>) :: Serialize a
@@ -739,7 +742,7 @@ Such closures can be applied to values using the \lstinline!<.>! operator.
 The \lstinline!remote! function is used to bring server side functions into
 scope on the client as \lstinline!Remote! functions. It is implemented using a
 simple counter which keeps track of how many functions have been imported so
-far and thus which ID to assign to the next remote function.
+far and thus which identifier to assign to the next remote function.
 
 \begin{code}
 remote :: Remotable a => a -> App (Remote a)
@@ -780,30 +783,37 @@ to initialize state holding elements and perform other setup functionality on
 the server.
 
 \begin{code}
-liftServerIO :: IO a -> App (RemoteValue a)
-liftServerIO _ = App $ return There
+liftServerIO :: IO a -> App (Server a)
+liftServerIO _ = App Server
 \end{code}
 
 As we can see, the implementation is as simple as can be. Since
-\lstinline!RemoteValue!s are represented by a dummy value on the client, we
+\lstinline!Server! is represented by a dummy value on the client, we
 just return said value.
 
 \paragraph{Server side implementations}
-The server side representation of the \lstinline!RemoteValue! and
+The server side representation of the \lstinline!Server! and
 \lstinline!Remote! types are in a sense the opposites of their client side
 counterparts.
 
 \begin{code}
+newtype Server a = Server (ReaderT SessionInfo IO a)
+  deriving (Functor, Applicative, Monad, MonadIO)
 data Remote a = Remote
 \end{code}
 
 Where the client is able to do something useful with the \lstinline!Remote!
-type, the server has no way to inspect \lstinline!Remote! functions, and thus
-only has a no-op implementation of the \lstinline!<.>! operator. On the other
-hand, it does have full access to the values and side effects produced by
-the \lstinline!liftServerIO! function, which is quite simple. The side effect
-is performed immediately and its result saved for later, as state holding
-elements should only be initialized once.
+type but can't touch \lstinline!Server! values, the server has no way to
+inspect \lstinline!Remote! functions, and thus only has a no-op implementation
+of the \lstinline!<.>! operator. On the other hand, it does have full access to
+the values and side effects of the \lstinline!Server! monad, which is an IO
+monad with some additional session data for the convenience of server
+side code.
+
+\lstinline!Server! values are produced by the \lstinline!liftServerIO! and
+\lstinline!remote! functions. \lstinline!liftServerIO! is quite simple:
+the function executes its argument immediately and the result is returned,
+tucked away within the \lstinline!Server! monad.
 
 \begin{code}
 liftServerIO :: IO a -> App (Server a)
