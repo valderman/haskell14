@@ -402,9 +402,10 @@ nowhere else. This is accomplished using a more restricted version of
 liftServerIO :: IO a -> App (Server a)
 \end{code}
 
-\lstinline!liftServerIO! performs its argument computation once, on the server,
-and then returns the result of said computation inside the
-\lstinline!Server! monad, only reachable by server side code.
+\lstinline!liftServerIO! performs its argument computation once on the server,
+in the \lstinline!App! monad, and then returns the result of said computation
+inside the \lstinline!Server! monad so that it is only reachable by server side
+code.
 Any client side code is thus free to completely ignore executing
 computations lifted using \lstinline!liftServerIO!; since the result of a
 server lifted computation is never observable on the client, the client has no
