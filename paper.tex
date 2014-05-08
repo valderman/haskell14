@@ -786,7 +786,7 @@ the server.
 
 \begin{code}
 liftServerIO :: IO a -> App (Server a)
-liftServerIO _ = App ServerDummy
+liftServerIO _ = App $ return ServerDummy
 \end{code}
 
 As we can see, the implementation is as simple as can be. Since
