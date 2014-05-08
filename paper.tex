@@ -369,23 +369,18 @@ using the GHC plugin system, through Template Haskell or by slightly altering
 how program entry points are treated in a compiler or wrapper script, to name
 a few. A non-intrusive method when using the GHC/Haste compiler pair would
 be to pass add \lstinline!-main-is setup! to both compilers' command line
-and add the \lstinline!setup! function in figure \ref{lst:setup} to the source
-code. This will instruct the server binary to listen on the port 1111 when
+and add the \lstinline!setup! function to the source code.
+This will instruct the server binary to listen on the port 1111 when
 started, and the client to attempt contact with that port on the local machine.
 
-The exact mechanism chosen to provide the host and port are implementation
-specific, and will in the interest of clarity not be discussed further.
-
-\begin{listingfloat}
 \begin{code}
 setup :: IO ()
 setup =
   runApp (mkConfig "ws://localhost:1111" 1111) main
 \end{code}
-\caption{Bootstrapping a Haste.App program}
-\label{lst:setup}
-\end{listingfloat}
 
+The exact mechanism chosen to provide the host and port are implementation
+specific, and will in the interest of clarity not be discussed further.
 
 \subsection{Using server side state}
 
@@ -724,44 +719,53 @@ application's \lstinline!Client! computation whereas on the server, this
 computation is discarded, and the server instead goes into an event loop,
 waiting for calls from the client.
 
-Aside from \lstinline!runClient!, the \lstinline!App! monad has two primary
-operations, both of which have slightly different implementations on the client
-and server respectively.
+The workings of the \lstinline!App! monad basically hinges on two abstract data
+types: \lstinline!RemoteValue! and \lstinline!Remote!. \lstinline!RemoteValue!
+is used to represent values which are available to the server but not to the
+client. \lstinline!Remote! denotes functions which live on the server but can
+be invoked remotely by the client. The implementation of these types and the
+functions that operate on them differ between the client and the server.
+
+\paragraph{Client side implementations}
+We begin by looking at the client side implementation.
 
 \begin{code}
-data RemoteValue a = Here a | There
+data RemoteValue a = There
 data Remote a = Remote CallID [JSON]
+\end{code}
 
-liftServerIO :: IO a -> App (RemoteValue a)
+As values of the \lstinline!RemoteValue! type are not accessible to the client,
+they are represented by a simple dummy value. The \lstinline!Remote! type is
+slightly more useful, containing the ID of a remote function and a list of the
+serialized arguments to be passed when invoking it. In essence, the
+\lstinline!Remote! type is an explicit representation of a remote closure.
+Such closures can be applied to values using the \lstinline!<.>! operator.
+
+\begin{code}
+(<.>) :: Serialize a
+      => Remote (a -> b) -> a -> Remote b
+(Remote identifier args) <.> arg =
+  Remote identifier (toJSON arg : args)
+\end{code}
+
+The \lstinline!remote! function is used to bring server side functions into
+scope on the client as \lstinline!Remote! functions. It is implemented using a
+simple counter which keeps track of how many functions have been imported so
+far and thus which ID to assign to the next remote function.
+
+\begin{code}
 remote :: Remotable a => a -> App (Remote a)
+remote _ = App $ do
+  (next_id, remotes) <- get
+  put (next_id+1, remotes)
+  return (Remote next_id [])
 \end{code}
 
-The client side definition of \lstinline!liftServerIO! is as simple as can be.
-
-\begin{code}
-liftServerIO _ = App $ return There
-\end{code}
-
-Its argument is simply ignored, and an opaque dummy value is returned; recall
-that server-lifted IO computations are not observable on the client. The
-server side implementation is only marginally more complex.
-
-\begin{code}
-liftServerIO m = App $ fmap Here m
-\end{code}
-
-Its argument IO computation is executed, and the result is wrapped in the
-\lstinline!Remote! constructor. The counterpart function, \lstinline!use!
-simply unwraps the \lstinline!Here! constructor and returns the contained
-value in the \lstinline!Server! monad.
-
-\begin{code}
-use :: Remote a -> Server a
-use (Here x) = return x
-\end{code}
-
-\lstinline!remote! is a more interesting function. Looking at its type, we see
-that it accepts any \lstinline!Remotable! value for its argument.
+As the remote function lives on the server, the client only needs an
+identifier to be able to call on it. The remote function is thus ignored,
+so that it can be optimized out of existence in the client executable. Looking
+at its type, we can see that \lstinline!remote! accepts any argument
+instantiating the \lstinline!Remotable! class.
 \lstinline!Remotable! is defined as follows.
 
 \begin{code}
@@ -783,20 +787,60 @@ serializable value in the \lstinline!Server! monad can be imported. The
 creating statically typed variadic functions, and works very much like the
 \lstinline!printf! function of Haskell's standard library.\ \cite{printf}
 
-The client implementation of \lstinline!remote! is not very complex.
+The final function operating on these types is \lstinline!liftServerIO!, used
+to initialize state holding elements and perform other setup functionality on
+the server.
 
 \begin{code}
-remote _ = App $ do
-  (next_id, remotes) <- get
-  put (next_id+1, remotes)
-  return (Remote next_id [])
+liftServerIO :: IO a -> App (RemoteValue a)
+liftServerIO _ = App $ return There
 \end{code}
 
-As the remote function lives on the server, the client only needs an
-identifier to be able to call on it. The remote function is thus ignored,
-so that it can be optimized out of existence in the client version of the code.
-The server version is only marginally more complex in that it updates the
-identifier-function mapping table as well.
+As we can see, the implementation is as simple as can be. Since
+\lstinline!RemoteValue!s are represented by a dummy value on the client, we
+just return said value.
+
+\paragraph{Server side implementations}
+The server side representation of the \lstinline!RemoteValue! and
+\lstinline!Remote! types are in a sense the opposites of their client side
+counterparts.
+
+\begin{code}
+data RemoteValue a = Here a
+data Remote a = Remote
+\end{code}
+
+Where the client is able to do something useful with the \lstinline!Remote!
+type but not with \lstinline!RemoteValue! the server has no way to inspect
+\lstinline!Remote! functions, and thus only has a no-op implementation of the
+\lstinline!<.>! operator. On the other hand, the server has full access to the
+contents of \lstinline!RemoteValue!s via the \lstinline!use! function.
+
+\begin{code}
+use :: RemoteValue a -> Server a
+use (Here x) = return x
+\end{code}
+
+Those values are produced by the \lstinline!remoteIO! function, which is quite
+simple. It merely executes its argument and wraps its argument in the
+\lstinline!RemoteValue! type.
+
+\begin{code}
+remoteIO :: IO a -> Server (RemoteValue a)
+remoteIO m = App $ fmap Here m
+\end{code}
+
+The server version of \lstinline!remote! is a little more complex than its
+client side counterpart. In addition to keeping track of the identifier of the
+next remote function, the server side \lstinline!remote! pairs up remote
+functions with these identifiers in an identifier-function mapping.
+
+\begin{code}
+remote f = App $ do
+  (next_id, remotes) <- get
+  put (next_id+1, (next_id, mkRemote f) : remotes)
+  return Remote
+\end{code}
 
 This concept of client side identifiers being sent to the server and used as
 indices into a table mapping identifiers to remotely accessible functions is an
@@ -804,24 +848,7 @@ extension of the concept of ``static values'' introduced by Epstein et al with
 Cloud Haskell\ \cite{cloudhaskell}, which is discussed further in section
 \ref{sec:cloudhaskell}.
 
-\begin{code}
-remote f = App $ do
-  (next_id, remotes) <- get
-  put (next_id+1, (next_id, mkRemote f) : remotes)
-  return (Remote next_id [])
-\end{code}
-
-The second argument of the \lstinline!Remote! constructor is the list of
-arguments to be sent to the function, to be updated as the remote function is
-applied using the \lstinline!<.>! operator.
-
-\begin{code}
-(<.>) :: Serialize a
-      => Remote (a -> b) -> a -> Remote b
-(Remote identifier args) <.> arg =
-  Remote identifier (toJSON arg : args)
-\end{code}
-
+\paragraph{The server side dispatcher}
 After the \lstinline!App! computation finishes, the identifier-function mapping
 accumulated in its state is handed over to the server's event loop, where it is
 used to dispatch the proper functions for incoming calls from the client.
