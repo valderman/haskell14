@@ -722,7 +722,7 @@ functions that operate on them differ between the client and the server.
 We begin by looking at the client side implementation for those two types.
 
 \begin{code}
-data Server a = Server
+data Server a = ServerDummy
 data Remote a = Remote CallID [JSON]
 \end{code}
 
@@ -786,7 +786,7 @@ the server.
 
 \begin{code}
 liftServerIO :: IO a -> App (Server a)
-liftServerIO _ = App Server
+liftServerIO _ = App ServerDummy
 \end{code}
 
 As we can see, the implementation is as simple as can be. Since
@@ -801,7 +801,7 @@ counterparts.
 \begin{code}
 newtype Server a = Server (ReaderT SessionInfo IO a)
   deriving (Functor, Applicative, Monad, MonadIO)
-data Remote a = Remote
+data Remote a = RemoteDummy
 \end{code}
 
 Where the client is able to do something useful with the \lstinline!Remote!
@@ -833,7 +833,7 @@ functions with these identifiers in an identifier-function mapping.
 remote f = App $ do
   (next_id, remotes) <- get
   put (next_id+1, (next_id, mkRemote f) : remotes)
-  return Remote
+  return RemoteDummy
 \end{code}
 
 This concept of client side identifiers being sent to the server and used as
