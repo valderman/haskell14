@@ -763,7 +763,7 @@ class Remotable a where
   mkRemote :: a -> ([JSON] -> Server JSON)
 
 instance Serialize a => Remotable (Server a) where
-  mkRemote m = fmap toJSON m
+  mkRemote m = \_ -> fmap toJSON m
 
 instance (Serialize a, Remotable b) =>
          Remotable (a -> b) where
