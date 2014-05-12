@@ -598,8 +598,6 @@ A complete listing of the core functions in Haste.App is given in table
 
 \begin{listingfloat}
 \begin{code}
-runApp       :: AppCfg -> App Done -> IO ()
-
 runClient    :: Client () -> App Done
 liftServerIO :: IO a -> App (Server a)
 remote       :: Remotable a
@@ -622,7 +620,6 @@ getSessionID :: Server SessionID
 \hline
 Function & Purpose \\
 \hline
-\lstinline!runApp! & Begin execution of a Haste.App program. \\
 \lstinline!runClient! & \parbox[t]{5cm}{Lift a single \lstinline!Client!
 computation into the \lstinline!App! monad. Must be at the very end of
 an \lstinline!App! computation, which is enforced by the type system.} \\
