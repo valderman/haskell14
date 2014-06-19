@@ -856,8 +856,8 @@ computation into the monad, it is possible to implement cooperative
 multitasking on top of the non-concurrent JavaScript runtime. This monad
 allows us to implement \lstinline!MVar!s as our blocking primitive, with the
 same semantics as their regular Haskell counterpart.\ \cite{ffi}
-This concurrency-enhanced monad is used as the basis of the \lstinline!Client!
-monad.
+This concurrency-enhanced IO monad is used as the basis of the
+\lstinline!Client! monad.
 
 \begin{code}
 type Nonce = Int
