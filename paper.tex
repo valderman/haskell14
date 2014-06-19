@@ -446,9 +446,9 @@ srvHello remoteRcpts = do
   recipients <- remoteRcpts
   sid <- getSessionID
   liftIO $ do
-    rcptMVar <- CC.newEmptyMVar
+    rcptChan <- CC.newChan
     CC.modifyMVar recipients $ \cs ->
-      return ((sid, rcptMVar):cs, ())
+      return ((sid, rcptChan):cs, ())
 \end{code}
 
 An \lstinline!MVar! is associated with the
@@ -463,7 +463,7 @@ srvSend remoteRcpts message = do
     rcpts <- remoteRcpts
     liftIO $ do
       recipients <- CC.readMVar rcpts
-      mapM_ (\rcpt -> writeChan rcpt message) recipients
+      mapM_ (flip CC.writeChan message) recipients
 \end{code}
 
 The send function is slightly more complex. The incoming message is written to
