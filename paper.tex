@@ -430,7 +430,7 @@ import Haste.App
 import Haste.App.Concurrent
 import qualified Control.Concurrent as CC
 
-type Recipient = (SessionID, CC.MVar String)
+type Recipient = (SessionID, CC.Chan String)
 type RcptList = CC.MVar [Recipient]
 \end{code}
 
@@ -463,17 +463,11 @@ srvSend remoteRcpts message = do
     rcpts <- remoteRcpts
     liftIO $ do
       recipients <- CC.readMVar rcpts
-      mapM_ (CC.forkIO . deliver message) recipients
-  where
-    deliver msg (_,rcptMVar) = CC.putMVar rcptMVar msg
+      mapM_ (\rcpt -> writeChan rcpt message) recipients
 \end{code}
 
 The send function is slightly more complex. The incoming message is written to
-the \lstinline!MVar! corresponding to each active session. Note the use of
-\lstinline!forkIO!. Some recipients may be slow to empty their \lstinline!MVar!
-to make room for a new message. In this case, we don't want to force all
-recipients to wait for the slowest one, so we spawn a new lightweight thread
-to handle delivery for each recipient.
+the \lstinline!Chan! corresponding to each active session.
 
 \begin{code}
 srvAwait :: Server RcptList -> Server String
@@ -483,12 +477,12 @@ srvAwait remoteRcpts = do
   liftIO $ do
     recipients <- CC.readMVar rcpts
     case lookup sid recipients of
-      Just mv -> CC.takeMVar mv
+      Just mv -> CC.readChan mv
       _       -> fail "Unregistered session!"
 \end{code}
 
 The final server operation, notifying users of pending messages, finds the
-appropriate \lstinline!MVar! to wait on by searching the recipient list for the
+appropriate \lstinline!Chan! to wait on by searching the recipient list for the
 session identifier of the calling user, and then blocks until a message arrives
 in said \lstinline!MVar!. This is a little different from the other two
 operations, which perform their work as quickly as possible and then return
@@ -497,8 +491,9 @@ immediately.
 If the caller's session identifier could not be found in the
 recipient list, it has for some reason not completed its handshake with the
 server. If this is the case, we simply drop the session by throwing an error;
-the session will be automatically cleaned up on the server side and an exception
-is thrown to the client.
+an exception will be thrown to the client. No server side state needs to be
+cleaned up as the very lack of such state was our reason for dropping the
+session.
 
 Having implemented our three server operations, all that's left is to tie them
 to the client. In this tying, we see our main advantage over the JavaScript
