@@ -191,9 +191,9 @@ send and receive text messages in real time - we opt for a very simple
 design. Two UI elements, \lstinline!logbox! and \lstinline!msgbox!, represent
 the chat log and the text area where the user inputs their messages
 respectively. When a message arrives, it is prepended to the chat log, making
-the most recent message appear at the of the log window, and when the user hits
-the return key in the input text box the message contained therein is sent and
-the input text box is cleared.
+the most recent message appear at the top of the log window, and when the user
+hits the return key in the input text box the message contained therein is sent
+and the input text box is cleared.
 
 Messages are transmitted as strings, with the initial four characters
 indicating the type of the message and the rest being the optional payload.
