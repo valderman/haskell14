@@ -862,23 +862,32 @@ This concurrency-enhanced IO monad is used as the basis of the
 
 \begin{code}
 type Nonce = Int
-type Client = StateT Nonce Conc
+type ClientState = (Nonce, Map Nonce (MVar JSON))
+type Client = StateT ClientState Conc
 \end{code}
 
 Aside from the added concurrency capabilities, the \lstinline!Client! monad
 only has a single particularly interesting operation: \lstinline!onServer!.
 
 \begin{code}
+newResult :: Client (Nonce, MVar JSON)
+newResult = do
+  (nonce, m) <- get
+  mv <- liftIO newEmptyMVar
+  put (nonce+1, insert nonce var m)
+  return (nonce, mv)
+
 onServer :: Serialize a
          => Remote (Server a) -> Client a
 onServer (Remote identifier args) = do
-  nonce <- get
-  put (nonce + 1)
-  mv <- createResultMVar nonce
+  (nonce, mv) <- newResult
   webSocketSend $
     toJSON (nonce, identifier, reverse args)  
-  takeMVar mv
+  fromJSON <$> takeMVar mv
 \end{code}
+
+The \lstinline!createResultMVar! function creates a new \lstinline!MVar!,
+paired with its corresponding nonce in the 
 
 After a call is dispatched, \lstinline!onServer! blocks, waiting for its
 \emph{result variable} to be filled with the result of the call. Filling this
@@ -889,8 +898,9 @@ executed every time a message arrives from the server.
 onMessage :: JSON -> Client ()
 onMessage response = do
   let (nonce, result) = fromJSON response
-  mv <- findResultMVar nonce
-  putMVar mv result
+  (n, m) <- get
+  put (n, delete nonce m)
+  putMVar (m ! nonce) result
 \end{code}
 
 As we can see, the implementation of our programming model is rather simple
