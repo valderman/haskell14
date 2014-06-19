@@ -310,8 +310,9 @@ may be used to refer to the remote function. In this example, the type of
 indicating that the identifier refers
 to a remote function with a single \lstinline!String! argument and no return
 value. Remote functions all live in the \lstinline!Server! monad.
-This part of the program is executed on both the server and the client, albeit
-with slightly different side effects, as described in section \ref{sec:impl}.
+The part of the program contained within the \lstinline!App! monad is executed
+on both the server and the client, albeit with slightly different side effects,
+as described in section \ref{sec:impl}.
 
 After the \lstinline!remote! call, we enter the domain of client-exclusive code
 with the application of \lstinline!runClient!. This function executes
@@ -344,28 +345,6 @@ After applying the value obtained from the user to the remote function,
 we apply the \lstinline!onServer! function to the result, which dispatches
 the RPC call to the server. \lstinline!onServer! will then block until the
 RPC call returns.
-
-Figure \ref{lst:hello-server} gives the code of this example in its entirety.
-
-\begin{listingfloat}
-\begin{code}
-import Haste.App
-
-helloServer :: String -> Server ()
-helloServer name =
-  liftIO $ putStrLn (name ++ " says hello!")
-
-main :: App Done
-main = do
-  greetings <- remote helloServer
-
-  runClient $ do
-    name <- prompt "Hi there, what is your name?"
-    onServer (greetings <.> name)
-\end{code}
-\caption{A seamless programming model: Hello Server}
-\label{lst:hello-server}
-\end{listingfloat}
 
 To run this example, an address and a port must be provided so that the client
 knows which server to contact. There are several ways of doing this:
