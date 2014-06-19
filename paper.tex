@@ -1271,7 +1271,7 @@ data representation: the client side of things must be able to obtain some
 representation of any function it may want to call on the server.
 
 In our solution, this representation is obtained through the use of the \lstinline!remote! function, which when executed on the server pairs a function with a
-unique identifier and on the client, and when executed on the client returns
+unique identifier, and when executed on the client returns
 said identifier so that the client may now refer to the function. While this
 has the advantage of being simple to implement, one major drawback of this
 method is that all functions must be explicitly imported in the \lstinline!App!
