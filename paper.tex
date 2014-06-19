@@ -454,7 +454,8 @@ srvHello remoteRcpts = do
 An \lstinline!MVar! is associated with the
 connecting client's session identifier, and the pair is prepended to the
 recipient list. Notice how the application's server state is passed in as the
-function's argument.
+function's argument, wrapped in the \lstinline!Server! monad in order to
+prevent client-side inspection.
 
 \begin{code}
 srvSend :: Server RcptList -> String -> Server ()
