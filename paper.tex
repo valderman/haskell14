@@ -451,7 +451,7 @@ srvHello remoteRcpts = do
       return ((sid, rcptMVar):cs, ())
 \end{code}
 
-The handshake is a simple operation; an \lstinline!MVar! is associated with the
+An \lstinline!MVar! is associated with the
 connecting client's session identifier, and the pair is prepended to the
 recipient list. Notice how the application's server state is passed in as the
 function's argument.
