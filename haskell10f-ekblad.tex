@@ -175,7 +175,7 @@ window.onload = function() {
       if(e.keyCode == 13) {
         var msg = msgbox.value;
         msgbox.value = '';
-        chat(msg);
+        chat(sock, msg);
       }
     });
   };
