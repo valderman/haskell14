@@ -158,23 +158,23 @@ at hand.
 \begin{listingfloat}
 \begin{lstlisting}[language=JavaScript]
 function handshake(sock) {sock.send('helo');}
-function chat(sock, msg) {sock.send('text' + msg);}
+function chat(sock,msg) {sock.send('text'+msg);}
 
 window.onload = function() {
-  var logbox = document.getElementById('log');
-  var msgbox = document.getElementById('message');
+  var log = document.getElementById('log');
+  var msg = document.getElementById('msg');
   var sock = new WebSocket('ws://example.com');
 
   sock.onmessage = function(e) {
-    logbox.value = e.data + NEWLINE + logbox.value;
+    log.value = e.data + NEWLINE + log.value;
   };
 
   sock.onopen = function(e) {
     handshake(sock);
-    msgbox.addEventListener('keydown', function(e) {
+    msg.addEventListener('keydown', function(e) {
       if(e.keyCode == 13) {
-        var msg = msgbox.value;
-        msgbox.value = '';
+        var msg = msg.value;
+        msg.value = '';
         chat(sock, msg);
       }
     });
@@ -187,7 +187,7 @@ window.onload = function() {
 
 Since the ``chatbox'' application is very simple - users should only be able to
 send and receive text messages in real time - we opt for a very simple
-design. Two UI elements, \lstinline!logbox! and \lstinline!msgbox!, represent
+design. Two UI elements, \lstinline!log! and \lstinline!msg!, represent
 the chat log and the text area where the user inputs their messages
 respectively. When a message arrives, it is prepended to the chat log, making
 the most recent message appear at the top of the log window, and when the user
@@ -291,7 +291,7 @@ main = do
   greetings <- remote helloServer
 
   runClient $ do
-    name <- prompt "Hi there, what is your name?"
+    name <- prompt "Hello, what is your name?"
     onServer (greetings <.> name)
 \end{code}
 
@@ -355,8 +355,8 @@ and add the \lstinline!setup! function to the source code.
 
 \begin{code}
 setup :: IO ()
-setup =
-  runApp (mkConfig "ws://localhost:1111" 1111) main
+setup = runApp cfg main
+  where cfg = mkConfig "ws://localhost:1111" 1111
 \end{code}
 
 This will instruct the server binary to listen on the port 1111 when
@@ -397,7 +397,7 @@ main = do
 
   count <- remote $ do
     r <- remoteref
-    liftIO $ atomicModifyIORef r (\v -> (v+1, v+1))
+    liftIO $ atomicModifyIORef r (\v -> (v+1,v+1))
 
   runClient $ do
     visitors <- onServer count
@@ -511,7 +511,7 @@ main = do
   sendMsg <- remote $ srvSend recipients
 
   runClient $ do
-    withElems ["log","message"] $ \[log,msgbox] -> do
+    withElems ["log","msg"] $ \[log,msg] -> do
       onServer hello
 \end{code}
 
@@ -526,18 +526,18 @@ The \lstinline!withElems! function is part of the Haste compiler's bundled DOM
 manipulation library; it locates references to the DOM nodes with the given
 identifiers and passes said references to a function.
 In this case the variable \lstinline!log! will be bound to the node
-with the identifier ``log'', and \lstinline!msgbox! will be bound to the node
-identified by ``message''. These are the same DOM nodes that were referenced in
+with the identifier ``log'', and \lstinline!msg! will be bound to the node
+identified by ``msg''. These are the same DOM nodes that were referenced in
 our original example, and refer to the chat log window and the text input
 field respectively. After locating all the needed UI elements, the client
 proceeds to register itself with the server's recipient list using the
 \lstinline!hello! remote computation.
 
 \begin{code}
-      let recvLoop chatlines = do
-            setProp log "value" $ unlines chatlines
+      let recvLoop hist = do
+            setProp log "value" $ unlines hist
             message <- onServer awaitMsg
-            recvLoop (message : chatlines)
+            recvLoop (message : hist)
       fork $ recvLoop []
 \end{code}
 
@@ -551,10 +551,10 @@ the \lstinline!awaitMsg! function blocks until a message arrives,
 \lstinline!recvLoop! will make exactly one iteration per received message.
 
 \begin{code}
-      msgbox `onEvent` OnKeyPress $ \13 -> do
-        msg <- getProp msgbox "value"
-        setProp msgbox "value" ""
-        onServer (sendMsg <.> msg)
+      msg `onEvent` OnKeyPress $ \13 -> do
+        msgtext <- getProp msg "value"
+        setProp msg "value" ""
+        onServer (sendMsg <.> msgtext)
 \end{code}
 
 This is the final part of our program; we set up an event handler to clear the
@@ -736,7 +736,8 @@ instantiating the \lstinline!Remotable! class.
 class Remotable a where
   mkRemote :: a -> ([JSON] -> Server JSON)
 
-instance Serialize a => Remotable (Server a) where
+instance Serialize a =>
+         Remotable (Server a) where
   mkRemote m = \_ -> fmap toJSON m
 
 instance (Serialize a, Remotable b) =>
@@ -770,8 +771,9 @@ The server side representation of the \lstinline!Server! and
 counterparts.
 
 \begin{code}
-newtype Server a = Server (ReaderT SessionInfo IO a)
-  deriving (Functor, Applicative, Monad, MonadIO)
+newtype Server a =
+  Server (ReaderT SessionInfo IO a)
+  deriving (Functor,Applicative,Monad,MonadIO)
 data Remote a = RemoteDummy
 \end{code}
 
@@ -803,7 +805,7 @@ functions with these identifiers in an identifier-function mapping.
 \begin{code}
 remote f = App $ do
   (next_id, remotes) <- get
-  put (next_id+1, (next_id, mkRemote f) : remotes)
+  put (next_id+1, (next_id,mkRemote f):remotes)
   return RemoteDummy
 \end{code}
 
@@ -820,9 +822,9 @@ used to dispatch the proper functions for incoming calls from the client.
 
 \begin{code}
 onEvent :: [(CallID, Method)] -> JSON -> IO ()
-onEvent mapping incoming = do
-  let (nonce, identifier, args) = fromJSON incoming
-      Just f = lookup identifier mapping
+onEvent mapping json = do
+  let (nonce, ident, args) = fromJSON json
+      Just f = lookup ident mapping
   result <- f args
   webSocketSend $ toJSON (nonce, result)
 \end{code}
@@ -856,7 +858,7 @@ This concurrency-enhanced IO monad is used as the basis of the
 
 \begin{code}
 type Nonce = Int
-type ClientState = (Nonce, Map Nonce (MVar JSON))
+type ClientState = (Nonce,Map Nonce (MVar JSON))
 type Client = StateT ClientState Conc
 \end{code}
 
@@ -1038,24 +1040,28 @@ implements mutable variables using this custom JavaScript interface.
 \begin{code}
 import Haste.Foreign
 
--- A MutableVar is completely opaque to Haskell code
--- and is only ever manipulated in JavaScript. Thus,
--- we use the Unpacked type to represent it,
--- indicating a completely opaque value.
+-- A MutableVar is completely opaque to Haskell
+-- code and is only ever manipulated in
+-- JavaScript. Thus, we use the Unpacked type
+-- to represent it, indicating a completely
+-- opaque value.
 newtype MutableVar a = MV Unpacked
 
 instance Marshal (MutableVar a) where
   pack          = MV
   unpack (MV x) = x
 
-newMutable :: Marshal a => a -> IO (MutableVar a)
-newMutable = ffi "(function(x) {return {val: x};})"
+newMutable :: Marshal a =>
+              a -> IO (MutableVar a)
+newMutable = ffi "(function(x){return {val:x};})"
 
-setMutable :: Marshal a => MutableVar a -> a -> IO ()
-setMutable = ffi "(function(m, x) {m.val = x;})"
+setMutable :: Marshal a =>
+              MutableVar a -> a -> IO ()
+setMutable = ffi "(function(m, x){m.val = x;})"
 
-getMutable :: Marshal a => MutableVar a -> IO a
-getMutable = ffi "(function(m) {return m.val;})"
+getMutable :: Marshal a =>
+              MutableVar a -> IO a
+getMutable = ffi "(function(m){return m.val;})"
 \end{code}
 \caption{Mutable variables with \lstinline!Haste.Foreign!}
 \label{lst:ffi}
