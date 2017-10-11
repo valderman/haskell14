@@ -880,9 +880,6 @@ onServer (Remote identifier args) = do
   fromJSON <$> takeMVar mv
 \end{code}
 
-The \lstinline!createResultMVar! function creates a new \lstinline!MVar!,
-paired with its corresponding nonce in the 
-
 After a call is dispatched, \lstinline!onServer! blocks, waiting for its
 \emph{result variable} to be filled with the result of the call. Filling this
 variable is the responsibility of the \emph{receive callback}, which is
